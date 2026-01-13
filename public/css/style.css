@@ -1,42 +1,116 @@
-/* Sidebar */
+/* Sidebar Variables for easy theme changes */
+:root {
+    --sidebar-width: 250px;
+    --sidebar-bg: #1a1d20;
+    --active-bg: #3b82f6; /* Modern Blue */
+    --text-color: #adb5bd;
+    --hover-bg: #2c3034;
+}
+
 #sidebar {
     position: fixed;
-    left: -15%;
-    width: 15%;
+    left: calc(-1 * var(--sidebar-width));
+    width: var(--sidebar-width);
     height: 100vh;
-    background: #212529;
+    background: var(--sidebar-bg);
     color: #fff;
-    transition: margin-left 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.3);
 }
-
-/* Sidebar appear */
+ 
+/* Sidebar Toggle Logic */
 #wrapper.active #sidebar {
-    margin-left: 15%;
+    left: 0;
 }
 
-/* Content area */
-#content {/*  width of sidebar */
-    transition: margin-left 0.3s;
+#wrapper.active #content {
+    margin-left: var(--sidebar-width);
 }
 
-    /* Adjust when sidebar hidden */
-    #wrapper.active #content {
-        margin-left: 15%;
-    }
+/* Header & Logo */
+.sidebar-header {
+    padding: 25px 20px;
+    text-align: center;
+    border-bottom: 1px solid #2d3238;
+}
 
-/* Sidebar active link */
+.sidebar-header .logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: var(--active-bg);
+}
+
+/* Navigation Links */
+#sidebar ul.components {
+    padding: 15px 0;
+    flex-grow: 1;
+}
+
+#sidebar ul li a {
+    padding: 12px 25px;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    color: var(--text-color);
+    text-decoration: none;
+    transition: 0.2s;
+}
+
+#sidebar ul li a i {
+    margin-right: 15px;
+    width: 20px;
+    text-align: center;
+}
+
+/* Active State with an Accent Bar */
 #sidebar ul li.active {
-    background: #343a40; /* darken */
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%);
+    position: relative;
+}
+
+#sidebar ul li.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 4px;
+    background: var(--active-bg);
 }
 
 #sidebar ul li.active a {
     color: #fff;
-    font-weight: 600;
 }
 
-/* Optional hover */
-#sidebar ul li:hover {
-    background: #495057;
+#sidebar ul li:not(.active):hover {
+    background: var(--hover-bg);
+    color: #fff;
 }
 
+/* Footer Section */
+.sidebar-footer {
+    padding: 20px;
+    border-top: 1px solid #2d3238;
+}
+
+.logout-btn {
+    color: #ff4d4d;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    #sidebar {
+        width: 100%; /* Take full screen on mobile */
+        left: -100%;
+    }
+    #wrapper.active #content {
+        margin-left: 0; /* Don't push content on mobile, just overlay */
+    }
+}

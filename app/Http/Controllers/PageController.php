@@ -9,26 +9,26 @@ use Illuminate\Routing\Controller as BaseController;
 class PageController extends Controller
 {
     public function showLogin(){
-        return view('layouts.auth.login');
+        return view('pages.auth.login');
     }
     public function main(){
         if(!session()->has('usr_id')){
             return redirect('/login')->with('error','Please login first.');
         }
-        return view('layouts.pages.dashboards.admin');
+        return view('pages.dashboards.admin');
     }
 
     // Dashboard pages
     public function admindashboard(){
-        return view('layouts.pages.dashboards.admin');
+        return view('pages.dashboards.admin');
     }
     public function offdashboard(){
-        return view('layouts.pages.dashboards.official');
+        return view('pages.dashboards.official');
     }
-    public function teresdashboard(){
-        return view('layouts.pages.dashboards.treasurer');
+    public function tresdashboard(){
+        return view('pages.dashboards.treasurer');
     }
     public function memdashboard(){
-        return view('layouts.pages.dashboards.member');
+        return view('pages.dashboards.member');
     }
 }
