@@ -24,23 +24,10 @@ class AuthController extends Controller
             session()->put('usr_id', $users->id);
             session()->put('usr_name', $users->username);
             session()->put('usr_role', $users->role);
-
-
-            switch ($users->role) {
-                case '1':
-                    return redirect()->action([PageController::class, 'admindashboard']);
-                    break;
-                case '2':
-                    return redirect()->action([PageController::class, 'offdashboard']);
-                    break;
-                case '3':
-                    return redirect()->action([PageController::class, 'tresdashboard']);
-                    break;
-                case '4':
-                    return redirect()->action([PageController::class, 'memdashboard']);
-                default:
-                    return redirect()->action([PageController::class, 'showLogin'])->with('error','Invalid Login Credentials.');
-            }
+                
+            return redirect()->action([PageController::class, 'main']);
+        } else {
+            return redirect()->action([PageController::class, 'showLogin'])->with('error','Invalid Login Credentials.');
         }
     }
     
@@ -52,6 +39,11 @@ class AuthController extends Controller
 
         return redirect()->action([PageController::class,'showLogin'])->with('success', 'Successfuly signed out.');
     }
+
+//     public function logout() {
+//     session()->flush(); // Clear all session data
+//     return redirect('/')->with('success', 'Logged out successfully.');
+// }
 
     public function changePass(Request $request)
     {

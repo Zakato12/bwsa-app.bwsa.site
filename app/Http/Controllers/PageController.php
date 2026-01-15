@@ -15,20 +15,20 @@ class PageController extends Controller
         if(!session()->has('usr_id')){
             return redirect('/login')->with('error','Please login first.');
         }
-        return view('pages.dashboards.admin');
-    }
 
-    // Dashboard pages
-    public function admindashboard(){
-        return view('pages.dashboards.admin');
-    }
-    public function offdashboard(){
-        return view('pages.dashboards.official');
-    }
-    public function tresdashboard(){
-        return view('pages.dashboards.treasurer');
-    }
-    public function memdashboard(){
-        return view('pages.dashboards.member');
+        if(session()->has('usr_role')){
+            switch (session('usr_role')) {
+                case '1':
+                    return view('pages.dashboards.admin');
+                case '2':
+                    return view('pages.dashboards.official');
+                case '3':
+                    return view('pages.dashboards.tresurer');
+                case '4':
+                    return view('pages.dashboards.member');
+                default:
+                    return redirect()->action([PageController::class, 'showLogin'])->with('error','Invalid Login Credentials.');
+            }
+        }
     }
 }
