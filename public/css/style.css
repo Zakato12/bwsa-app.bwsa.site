@@ -91,6 +91,16 @@
     color: #fff;
 }
 
+#sidebar ul li.has-sub > a::after {
+    content: "▸";
+    float: right;
+    transition: transform 0.3s;
+}
+
+#sidebar ul li.open > a::after {
+    transform: rotate(90deg);
+}
+
 /* Footer Section */
 .sidebar-footer {
     padding: 20px;
@@ -102,6 +112,44 @@
     text-decoration: none;
     display: flex;
     align-items: center;
+}
+
+/* Sublist */
+.sublist {
+    display: none;
+    background: #2b3035;
+    list-style: none;
+    nav-left: 10px;
+    margin: 0;
+}
+#sidebar ul li.open .sublist {
+    display: block;
+    background: var(--sidebar-bg);
+}
+
+.sublist li a {
+    padding-left: 40px;
+    font-size: 14px;
+}
+
+.sublist li.active a {
+    background: #495057;
+}
+
+.link-style-button {
+    background: none;
+    border: none;
+    color: #ff4d4d; /* Your logout red */
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.link-style-button i {
+    margin-right: 15px; /* Matches your sidebar spacing */
 }
 
 /* Mobile Responsiveness */

@@ -21,10 +21,12 @@ class AuthController extends Controller
         ->first();
 
         if($users && Hash::check($usr_pass, $users->password)){
+
             session()->put('usr_id', $users->id);
             session()->put('usr_name', $users->username);
             session()->put('usr_role', $users->role);
-                
+            session()->put('last_activity', time());
+
             return redirect()->action([PageController::class, 'main']);
         } else {
             return redirect()->action([PageController::class, 'showLogin'])->with('error','Invalid Login Credentials.');

@@ -4,28 +4,28 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 
 class CheckInactivity
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
-    public function handle($request, Closure $next)
+    public function handle(Request $request, Closure $next)
     {
-        $timeout = 60;
-        $lastActivity = session('last_activity');
+        // Skip check if the user is on the login page
+        if ($request->is('/') || $request->is('login')) {
+            return $next($request);
+        }
 
+        // Only check if our custom session exists
         if (session()->has('usr_id')) {
+            $timeout = 600; // 10 minutes
+            $lastActivity = session('last_activity');
+
             if ($lastActivity && (time() - $lastActivity > $timeout)) {
-                // Clear the session
                 session()->flush();
-                return redirect('/login')->with('error', 'You have been logged out due to inactivity.');
+                // Redirecting to the NAME 'login' is what prevents the Method error
+                return redirect()->route('login')->with('error', 'Session expired due to inactivity.');
             }
-            
-            // Update the timestamp on every click/request
+
+            // Update timestamp
             session(['last_activity' => time()]);
         }
 

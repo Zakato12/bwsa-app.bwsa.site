@@ -26,11 +26,12 @@
                         </button>
                     </li>
                     <li><hr class="dropdown-divider"></li>
-                    <li>
-                        <a class="dropdown-item text-danger d-flex align-items-center" href="{{ url('/logout') }}">
-                            <i class="fa fa-sign-out me-2"></i> Logout
-                        </a>
-                    </li>
+                    <form action="{{ route('logout') }}" method="POST">
+                        @csrf
+                        <button type="submit" class="dropdown-item d-flex align-items-center text-danger w-100">
+                            <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
+                        </button>
+                    </form>
                 </ul>
             </div>
         </div>

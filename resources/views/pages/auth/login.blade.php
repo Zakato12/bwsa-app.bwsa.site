@@ -29,7 +29,7 @@
             </div>
              
             <form class="login-form" id="loginForm" method="post" action="{{ url('/login') }}">
-                {{ csrf_field() }}
+                @csrf
                 <div class="form-group">
                     <div class="input-wrapper">
                         <input
