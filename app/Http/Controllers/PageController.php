@@ -31,4 +31,8 @@ class PageController extends Controller
             }
         }
     }
+
+    public function showAddUser(){
+        return view('pages.users.create');
+    }
 }

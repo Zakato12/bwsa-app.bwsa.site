@@ -17,3 +17,6 @@ Route::post('/dashboard', [AuthController::class,'changePass']);
 
 Route::post('/change-password', [AuthController::class, 'changePass']);
 
+// USER MANAGEMENT
+Route::get('/users/add', [PageController::class,'showAddUser']);
+Route::post('/users/add', [AuthController::class, 'addUser'])->name('users.add');
