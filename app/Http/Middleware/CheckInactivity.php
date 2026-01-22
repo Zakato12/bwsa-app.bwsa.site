@@ -16,7 +16,7 @@ class CheckInactivity
 
         // Only check if our custom session exists
         if (session()->has('usr_id')) {
-            $timeout = 600; // 10 minutes
+            $timeout = 60;
             $lastActivity = session('last_activity');
 
             if ($lastActivity && (time() - $lastActivity > $timeout)) {
@@ -24,7 +24,6 @@ class CheckInactivity
                 // Redirecting to the NAME 'login' is what prevents the Method error
                 return redirect()->route('login')->with('error', 'Session expired due to inactivity.');
             }
-
             // Update timestamp
             session(['last_activity' => time()]);
         }

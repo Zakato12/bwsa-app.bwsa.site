@@ -6,7 +6,8 @@ use App\Http\Controllers\PageController;
 
 // LOGIN ROUTES
 Route::get('/', [PageController::class,'showLogin']);
-Route::post('/login', [AuthController::class, 'login'])->name('login');
+Route::get('/login', [PageController::class,'userincactive'])->name('login');
+Route::post('/login', [AuthController::class, 'login']);
 
 // LOGOUT
 Route::post('/logout', [AuthController::class,'logout'])->name('logout');
