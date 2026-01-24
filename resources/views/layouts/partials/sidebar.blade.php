@@ -13,22 +13,24 @@
                 </a>
             </li>
 
-            <!-- Users with sublist -->
-            <li class="has-sub {{ request()->is('users*') ? 'open active' : '' }}">
-                <a class="sublist-toggle">
-                    <i class="fas fa-users"></i> <span>Users</span>
-                </a>
+            @if (session('usr_id') === 1)
+                <!-- Users with sublist -->
+                    <li class="has-sub {{ request()->is('users*') ? 'open active' : '' }}">
+                        <a class="sublist-toggle">
+                            <i class="fas fa-users"></i> <span>Users</span>
+                        </a>
 
-                <ul class="sublist">
-                    <li class="{{ request()->is('users/add') ? 'active' : '' }}">
-                        <a href="{{ url('/users/add') }}">Add User</a>
-                    </li>
+                        <ul class="sublist">
+                            <li class="{{ request()->is('users/add') ? 'active' : '' }}">
+                                <a href="{{ url('/users/add') }}">Add User</a>
+                            </li>
 
-                    <li class="{{ request()->is('users/list') ? 'active' : '' }}">
-                        <a href="{{ url('/users/list') }}">User List</a>
+                            <li class="{{ request()->is('users/list') ? 'active' : '' }}">
+                                <a href="{{ url('/users/list') }}">User List</a>
+                            </li>
+                        </ul>
                     </li>
-                </ul>
-            </li>
+            @endif
 
             <!-- Reports -->
             <li class="{{ request()->is('reports*') ? 'active' : '' }}">

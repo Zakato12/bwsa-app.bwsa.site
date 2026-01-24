@@ -22,7 +22,7 @@ class AuthController extends Controller
 
         if($users && Hash::check($usr_pass, $users->password)){
 
-            session()->put('usr_id', $users->id);
+            session()->put('usr_id', hash('sha256', $users->id));
             session()->put('usr_name', $users->username);
             session()->put('usr_role', $users->role);
             session()->put('last_activity', time());

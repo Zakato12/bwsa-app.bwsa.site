@@ -12,11 +12,11 @@ class PageController extends Controller
         return view('pages.auth.login');
     }
     public function userincactive(){
-        return view('pages.auth.login')->with('error','Your account is inactive. Please login again.');
+        return view('/login')->with('error','Your account is inactive. Please login again.');
     }
     public function main(){
         if(!session()->has('usr_id')){
-            return redirect('/login')->with('error','Please login first.');
+            return view('pages.auth.login')->with('error','Please login first.');
         }
 
         if(session()->has('usr_role')){
