@@ -1,0 +1,153 @@
+@extends('layouts.main')
+
+@section('page-title', 'Payments')
+
+@section('content')
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{{ in_array(session('usr_role'), ['admin', 'official']) ? 'Payments Management' : 'My Bills & Payments' }}</h1>
+        @if(session('usr_role') == 'treasurer')
+            <a href="{{ route('payments.createBill') }}" class="btn btn-success">Generate Bill</a>
+        @elseif(!in_array(session('usr_role'), ['admin', 'official', 'treasurer']))
+            <a href="{{ route('payments.create') }}" class="btn btn-primary">Submit Payment</a>
+        @endif
+    </div>
+
+    @if(in_array(session('usr_role'), ['admin', 'official']))
+        <!-- Admin/Official View: All Payments -->
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th><a href="?sort_by=amount&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '↑' : '↓') : '' }}</a></th>
+                        <th>Method</th>
+                        <th><a href="?sort_by=status&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '↑' : '↓') : '' }}</a></th>
+                        <th>OCR Amount</th>
+                        <th>Reference</th>
+                        <th><a href="?sort_by=created_at&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '↑' : '↓') : '' }}</a></th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($payments as $p)
+                    <tr>
+                        <td>{{ $p->id }}</td>
+                        <td>{{ $p->user_name }}</td>
+                        <td>{{ number_format($p->amount, 2) }}</td>
+                        <td>{{ $p->payment_method == 0 ? 'Bill' : ($p->payment_method == 1 ? 'Cash' : 'GCash') }}</td>
+                        <td>
+                            @if($p->status == 0)
+                                <span class="badge bg-secondary">Bill Generated</span>
+                            @elseif($p->status == 1)
+                                <span class="badge bg-warning">Pending</span>
+                            @elseif($p->status == 2)
+                                <span class="badge bg-info">Verified</span>
+                            @elseif($p->status == 3)
+                                <span class="badge bg-success">Approved</span>
+                            @else
+                                <span class="badge bg-danger">Failed</span>
+                            @endif
+                        </td>
+                        <td>{{ $p->extracted_amount ? number_format($p->extracted_amount, 2) : '-' }}</td>
+                        <td>{{ $p->extracted_reference ?? '-' }}</td>
+                        <td>{{ $p->created_at->format('M d, Y') }}</td>
+                        <td>
+                            @if($p->status == 1 && $p->payment_method == 2)
+                                <form action="{{ route('payments.verify', $p->id) }}" method="POST" style="display:inline;">
+                                    @csrf
+                                    <button type="submit" class="btn btn-success btn-sm">Verify</button>
+                                </form>
+                            @endif
+                            @if($p->status == 2)
+                                <form action="{{ route('payments.approve', $p->id) }}" method="POST" style="display:inline;">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+                                </form>
+                            @endif
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @else
+        <!-- Resident View: Bills and Payment History -->
+        <div class="row">
+            <div class="col-md-6">
+                <h3>My Bills</h3>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Amount</th>
+                                <th>Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($bills as $bill)
+                            <tr>
+                                <td>{{ $bill->id }}</td>
+                                <td>{{ number_format($bill->amount, 2) }}</td>
+                                <td>{{ $bill->created_at->format('M d, Y') }}</td>
+                                <td>
+                                    <a href="{{ route('payments.create') }}?bill_id={{ $bill->id }}" class="btn btn-primary btn-sm">Pay Bill</a>
+                                </td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="4" class="text-center">No bills found.</td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h3>Payment History</h3>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Amount</th>
+                                <th>Method</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($payments as $p)
+                            <tr>
+                                <td>{{ $p->id }}</td>
+                                <td>{{ number_format($p->amount, 2) }}</td>
+                                <td>{{ $p->payment_method == 1 ? 'Cash' : 'GCash' }}</td>
+                                <td>
+                                    @if($p->status == 1)
+                                        <span class="badge bg-warning">Pending</span>
+                                    @elseif($p->status == 2)
+                                        <span class="badge bg-info">Verified</span>
+                                    @elseif($p->status == 3)
+                                        <span class="badge bg-success">Approved</span>
+                                    @else
+                                        <span class="badge bg-danger">Failed</span>
+                                    @endif
+                                </td>
+                                <td>{{ $p->created_at->format('M d, Y') }}</td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="5" class="text-center">No payments found.</td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
+</div>
+@endsection

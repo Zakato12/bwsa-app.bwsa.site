@@ -3,6 +3,9 @@
             <div class="logo">
                 <i class="fas fa-water"></i> <span>BWASA</span>
             </div>
+            <button id="sidebarClose" class="btn btn-link text-white d-lg-none ms-auto">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
         <ul class="list-unstyled components">
 
@@ -13,7 +16,7 @@
                 </a>
             </li>
 
-            @if (session('usr_id') === 1)
+            @if (session('usr_role') == 'admin')
                 <!-- Users with sublist -->
                     <li class="has-sub {{ request()->is('users*') ? 'open active' : '' }}">
                         <a class="sublist-toggle">
@@ -30,7 +33,44 @@
                             </li>
                         </ul>
                     </li>
+
+                    <!-- Barangays -->
+                    <li class="{{ request()->is('barangays*') ? 'active' : '' }}">
+                        <a href="{{ url('/barangays') }}">
+                            <i class="fas fa-map-marker-alt"></i> <span>Barangays</span>
+                        </a>
+                    </li>
             @endif
+
+            <!-- Residents with sublist -->
+            <li class="has-sub {{ request()->is('residents*') ? 'open active' : '' }}">
+                <a class="sublist-toggle">
+                    <i class="fas fa-user-friends"></i> <span>Residents</span>
+                </a>
+
+                <ul class="sublist">
+                    <li class="{{ request()->is('residents') ? 'active' : '' }}">
+                        <a href="{{ url('/residents') }}">View Residents</a>
+                    </li>
+
+                    @if (in_array(session('usr_role'), ['admin', 'official']))
+                        <li class="{{ request()->is('residents/create') ? 'active' : '' }}">
+                            <a href="{{ url('/residents/create') }}">Add Resident</a>
+                        </li>
+                    @endif
+                </ul>
+            </li>
+
+            <!-- Payments -->
+            @if (in_array(session('usr_role'), ['admin', 'official']))
+                <li class="{{ request()->is('payments*') ? 'active' : '' }}">
+                    <a href="{{ url('/payments') }}">
+                        <i class="fas fa-money-bill-wave"></i> <span>Payments</span>
+                    </a>
+                </li>
+            @endif
+
+            @if (session('usr_role') == 'admin')
 
             <!-- Reports -->
             <li class="{{ request()->is('reports*') ? 'active' : '' }}">
@@ -54,16 +94,20 @@
             <li><a href="">
                 <i class="fas fa-cog"></i> <span>Settings</span>
             </a></li>
-        </ul>
+        
+            @endif
 
-        <div class="sidebar-footer">
-            <form action="{{ route('logout') }}" method="POST">
-                @csrf
-                <button type="submit" class="link-style-button">
-                    <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
-                </button>
-            </form>
-        </div>
+            <li>
+                <a href="">
+                    <form action="{{ route('logout') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="link-style-button">
+                        <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
+                    </button>
+                    </form>
+                </a>
+            </li>
+        </ul>
 </div>
 <script>
     document.querySelectorAll('.sublist-toggle').forEach(item => {

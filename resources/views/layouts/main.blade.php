@@ -12,6 +12,9 @@
             {{-- Sidebar --}}
             @include('layouts.partials.sidebar')
 
+            {{-- Sidebar Overlay --}}
+            <div id="sidebar-overlay"></div>
+
             {{-- Page Content --}}
             <div id="content">
 

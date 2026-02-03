@@ -17,14 +17,15 @@ class AuthController extends Controller
 
         $users = DB::table('users')
         ->where('username', $usr_name)
-        // ->where('active', '=', '1')
+        ->where('status', '=', 'active')
         ->first();
 
         if($users && Hash::check($usr_pass, $users->password)){
 
-            session()->put('usr_id', hash('sha256', $users->id));
+            $role = DB::table('roles')->where('id', $users->role_id)->value('name');
+            session()->put('usr_id', $users->id);
             session()->put('usr_name', $users->username);
-            session()->put('usr_role', $users->role);
+            session()->put('usr_role', $role);
             session()->put('last_activity', time());
 
             return redirect()->action([PageController::class, 'main']);
@@ -57,8 +58,9 @@ class AuthController extends Controller
             'confirmpassword' => 'required|string',
         ]);
 
-        // Plain-text comparison
-        if ($validated['currpassword'] != session('usr_pass')) {
+        $user = DB::table('users')->where('id', session('usr_id'))->first();
+
+        if (!$user || !Hash::check($validated['currpassword'], $user->password)) {
             return back()->with('error', 'Current password is incorrect');
         }
 
@@ -69,10 +71,63 @@ class AuthController extends Controller
         DB::table('users')
             ->where('id', session('usr_id'))
             ->update([
-                'password'=> Hash::make($validated['confirmpassword'])
-                ]);
-            session()->put('usr_pass', $validated['confirmpassword']);
+                'password'=> Hash::make($validated['confirmpassword']),
+                'updated_at' => now()
+            ]);
         return back()->with('success', 'Password updated successfully');
+    }
+
+    public function addUser(Request $request)
+    {
+        $currentRole = session('usr_role');
+        $allowedRoles = [];
+
+        if ($currentRole == 'admin') {
+            $allowedRoles = [1, 2, 3]; // admin, official, treasurer
+        } elseif ($currentRole == 'official') {
+            $allowedRoles = [4]; // resident
+        } else {
+            return redirect()->back()->with('error', 'Unauthorized to add users');
+        }
+
+        $rules = [
+            'username' => 'required|string|max:50|unique:users,username',
+            'password' => 'required|string|min:8',
+            'full_name' => 'required|string|max:100',
+            'role_id' => 'required|in:' . implode(',', $allowedRoles),
+            'status' => 'required|in:active,inactive',
+        ];
+
+        if (in_array($request->role_id, [2, 3])) { // official or treasurer
+            $rules['barangay_id'] = 'required|exists:barangays,id';
+        }
+
+        $validated = $request->validate($rules);
+
+        $data = [
+            'username' => $validated['username'],
+            'password' => Hash::make($validated['password']),
+            'full_name' => $validated['full_name'],
+            'role_id' => $validated['role_id'],
+            'status' => $validated['status'],
+            'created_at' => now(),
+        ];
+
+        if (isset($validated['barangay_id'])) {
+            $data['barangay_id'] = $validated['barangay_id'];
+        }
+
+        $userId = DB::table('users')->insertGetId($data);
+
+        if ($validated['role_id'] == 4) { // resident
+            DB::table('residents')->insert([
+                'user_id' => $userId,
+                'barangay_id' => $validated['barangay_id'] ?? null, // assume barangay for resident
+                'created_at' => now(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'User added successfully');
     }
 }
 

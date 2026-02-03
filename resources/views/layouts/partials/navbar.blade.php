@@ -2,7 +2,7 @@
 <nav class="navbar navbar-custom navbar-expand-lg">
     <div class="container-fluid">
         <!-- Toggle button -->
-        <button class="btn btn-dark shadow-none text-white me-3" id="sidebarToggle">
+        <button class="btn btn-dark shadow-none text-white me-3 d-lg-none" id="sidebarToggle">
             ☰
         </button>
 
@@ -26,12 +26,14 @@
                         </button>
                     </li>
                     <li><hr class="dropdown-divider"></li>
-                    <form action="{{ route('logout') }}" method="POST">
+                    <li>
+                        <form action="{{ route('logout') }}" method="POST">
                         @csrf
                         <button type="submit" class="dropdown-item d-flex align-items-center text-danger w-100">
                             <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
                         </button>
-                    </form>
+                        </form>
+                    </li>
                 </ul>
             </div>
         </div>

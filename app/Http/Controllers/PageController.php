@@ -21,13 +21,13 @@ class PageController extends Controller
 
         if(session()->has('usr_role')){
             switch (session('usr_role')) {
-                case '1':
+                case 'admin':
                     return view('pages.dashboards.admin');
-                case '2':
+                case 'official':
                     return view('pages.dashboards.official');
-                case '3':
+                case 'treasurer':
                     return view('pages.dashboards.tresurer');
-                case '4':
+                case 'resident':
                     return view('pages.dashboards.member');
                 default:
                     return redirect()->action([PageController::class, 'showLogin'])->with('error','Invalid Login Credentials.');
