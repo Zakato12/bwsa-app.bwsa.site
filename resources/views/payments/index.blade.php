@@ -5,7 +5,7 @@
 @section('content')
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>{{ in_array(session('usr_role'), ['admin', 'official']) ? 'Payments Management' : 'My Bills & Payments' }}</h1>
+        <h1>{{ in_array(session('usr_role'), ['admin', 'official', 'treasurer']) ? 'Payments Management' : 'My Bills & Payments' }}</h1>
         @if(session('usr_role') == 'treasurer')
             <a href="{{ route('payments.createBill') }}" class="btn btn-success">Generate Bill</a>
         @elseif(!in_array(session('usr_role'), ['admin', 'official', 'treasurer']))
@@ -13,8 +13,8 @@
         @endif
     </div>
 
-    @if(in_array(session('usr_role'), ['admin', 'official']))
-        <!-- Admin/Official View: All Payments -->
+    @if(in_array(session('usr_role'), ['admin', 'official', 'treasurer']))
+        <!-- Admin/Official/Treasurer View: All Payments -->
         <div class="table-responsive">
             <table class="table table-striped">
                 <thead>
@@ -26,6 +26,7 @@
                         <th><a href="?sort_by=status&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '↑' : '↓') : '' }}</a></th>
                         <th>OCR Amount</th>
                         <th>Reference</th>
+                        <th>Receipt</th>
                         <th><a href="?sort_by=created_at&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '↑' : '↓') : '' }}</a></th>
                         <th>Actions</th>
                     </tr>
@@ -52,19 +53,30 @@
                         </td>
                         <td>{{ $p->extracted_amount ? number_format($p->extracted_amount, 2) : '-' }}</td>
                         <td>{{ $p->extracted_reference ?? '-' }}</td>
-                        <td>{{ $p->created_at->format('M d, Y') }}</td>
                         <td>
-                            @if($p->status == 1 && $p->payment_method == 2)
-                                <form action="{{ route('payments.verify', $p->id) }}" method="POST" style="display:inline;">
-                                    @csrf
-                                    <button type="submit" class="btn btn-success btn-sm">Verify</button>
-                                </form>
+                            @if($p->receipt_image_path)
+                                <a href="{{ route('payments.receipt', $p->id) }}" class="btn btn-outline-secondary btn-sm">View</a>
+                            @else
+                                -
                             @endif
-                            @if($p->status == 2)
-                                <form action="{{ route('payments.approve', $p->id) }}" method="POST" style="display:inline;">
-                                    @csrf
-                                    <button type="submit" class="btn btn-primary btn-sm">Approve</button>
-                                </form>
+                        </td>
+                        <td>{{ \Carbon\Carbon::parse($p->created_at)->format('M d, Y') }}</td>
+                        <td>
+                            @if(session('usr_role') == 'treasurer')
+                                @if($p->status == 1 && $p->payment_method == 2)
+                                    <form action="{{ route('payments.verify', $p->id) }}" method="POST" style="display:inline;">
+                                        @csrf
+                                        <button type="submit" class="btn btn-success btn-sm">Verify</button>
+                                    </form>
+                                @endif
+                                @if($p->status == 2)
+                                    <form action="{{ route('payments.approve', $p->id) }}" method="POST" style="display:inline;">
+                                        @csrf
+                                        <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+                                    </form>
+                                @endif
+                            @else
+                                -
                             @endif
                         </td>
                     </tr>
@@ -92,7 +104,7 @@
                             <tr>
                                 <td>{{ $bill->id }}</td>
                                 <td>{{ number_format($bill->amount, 2) }}</td>
-                                <td>{{ $bill->created_at->format('M d, Y') }}</td>
+                                <td>{{ \Carbon\Carbon::parse($bill->created_at)->format('M d, Y') }}</td>
                                 <td>
                                     <a href="{{ route('payments.create') }}?bill_id={{ $bill->id }}" class="btn btn-primary btn-sm">Pay Bill</a>
                                 </td>
@@ -136,7 +148,7 @@
                                         <span class="badge bg-danger">Failed</span>
                                     @endif
                                 </td>
-                                <td>{{ $p->created_at->format('M d, Y') }}</td>
+                                <td>{{ \Carbon\Carbon::parse($p->created_at)->format('M d, Y') }}</td>
                             </tr>
                             @empty
                             <tr>

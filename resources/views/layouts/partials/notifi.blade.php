@@ -1,53 +1,41 @@
 @if(session('success') || session('warning') || session('error'))
-<div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-body text-center p-4">
-                
-                @if(session('success'))
-                    <i class="fas fa-check-circle text-success mb-3" style="font-size: 4rem;"></i>
-                    <h4 class="fw-bold">Success!</h4>
-                    <p class="text-muted">{{ session('success') }}</p>
-                @elseif(session('warning'))
-                    <i class="fas fa-exclamation-triangle text-warning mb-3" style="font-size: 4rem;"></i>
-                    <h4 class="fw-bold">Attention</h4>
-                    <p class="text-muted">{{ session('warning') }}</p>
-                @elseif(session('error'))
-                    <i class="fas fa-times-circle text-danger mb-3" style="font-size: 4rem;"></i>
-                    <h4 class="fw-bold">Error</h4>
-                    <p class="text-muted">{{ session('error') }}</p>
-                @endif
-
-                <button type="button" class="btn btn-dark w-100 mt-3" data-bs-dismiss="modal">Continue</button>
-            </div>
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+    <div id="notificationToast" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
+        <div class="toast-body d-flex align-items-start gap-3">
+            @if(session('success'))
+                <i class="fas fa-check-circle text-success" style="font-size: 1.5rem;"></i>
+                <div>
+                    <div class="fw-bold">Success</div>
+                    <div class="text-muted">{{ session('success') }}</div>
+                </div>
+            @elseif(session('warning'))
+                <i class="fas fa-exclamation-triangle text-warning" style="font-size: 1.5rem;"></i>
+                <div>
+                    <div class="fw-bold">Attention</div>
+                    <div class="text-muted">{{ session('warning') }}</div>
+                </div>
+            @elseif(session('error'))
+                <i class="fas fa-times-circle text-danger" style="font-size: 1.5rem;"></i>
+                <div>
+                    <div class="fw-bold">Error</div>
+                    <div class="text-muted">{{ session('error') }}</div>
+                </div>
+            @endif
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
     </div>
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        var myModal = new bootstrap.Modal(document.getElementById('notificationModal'));
-        myModal.show();
+        var toastEl = document.getElementById('notificationToast');
+        if (toastEl) {
+            var toast = new bootstrap.Toast(toastEl);
+            toast.show();
+            setTimeout(function () {
+                toast.hide();
+            }, 3000);
+        }
     });
 </script>
-<style>
-    #notificationModal .modal-content {
-    border-radius: 15px;
-    background: #ffffff;
-    }
-
-    #notificationModal h4 {
-        letter-spacing: -0.5px;
-    }
-
-    /* Optional: Slight animation for the icon */
-    #notificationModal .fas {
-        animation: zoomIn 0.3s ease-out;
-    }
-
-    @keyframes zoomIn {
-        from { transform: scale(0.5); opacity: 0; }
-        to { transform: scale(1); opacity: 1; }
-    }
-</style>
 @endif

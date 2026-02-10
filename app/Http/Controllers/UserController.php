@@ -9,15 +9,74 @@ class UserController extends Controller
 {
     public function listUsers()
     {
-        if (!session()->has('usr_id') || session('usr_role') != 'admin') {
-            return redirect()->route('login')->with('error', 'Unauthorized access');
+        if ($redirect = $this->requireRole(['admin'])) {
+            return $redirect;
         }
 
         $users = DB::table('users')
             ->join('roles', 'users.role_id', '=', 'roles.id')
-            ->select('users.id', 'users.username', 'users.full_name', 'roles.name as role', 'users.status', 'users.created_at')
+            ->join('barangays', 'users.barangay_id', '=', 'barangays.id')
+            ->select('users.id', 'users.username', 'users.full_name', 'roles.name as role', 'barangays.name as barangay_name', 'users.status', 'users.created_at', 'users.barangay_id', 'users.role_id')
+            ->where('users.id', '!=', '4')
+            ->where('users.id', '!=', '1')
             ->get();
 
-        return view('pages.users.list', compact('users'));
+        $barangays = DB::table('barangays')->select('id', 'name')->orderBy('name')->get();
+
+        return view('pages.users.list', compact('users', 'barangays'));
+    }
+
+    public function updateUser(Request $request, $id)
+    {
+        if ($redirect = $this->requireRole(['admin'])) {
+            return $redirect;
+        }
+
+        $validated = $request->validate([
+            'username' => 'required|string|max:50|unique:users,username,' . $id,
+            'full_name' => 'required|string|max:100',
+            'role_id' => 'required|exists:roles,id',
+            'status' => 'required|in:active,inactive',
+            'barangay_id' => 'nullable|exists:barangays,id',
+        ]);
+
+        $update = [
+            'username' => $validated['username'],
+            'full_name' => $validated['full_name'],
+            'role_id' => $validated['role_id'],
+            'status' => $validated['status'],
+            'updated_at' => now(),
+        ];
+
+        if (in_array((int) $validated['role_id'], [2, 3, 4], true)) {
+            $update['barangay_id'] = $validated['barangay_id'] ?? null;
+        } else {
+            $update['barangay_id'] = null;
+        }
+
+        DB::table('users')->where('id', $id)->update($update);
+
+        $this->appendAuditLedger('users.updated', [
+            'user_id' => (int) $id,
+            'role_id' => (int) $validated['role_id'],
+            'status' => $validated['status'],
+        ]);
+
+        return redirect()->route('users.list')->with('success', 'User updated successfully.');
+    }
+
+    public function deleteUser($id)
+    {
+        if ($redirect = $this->requireRole(['admin'])) {
+            return $redirect;
+        }
+
+        DB::table('users')->where('id', $id)->update(['status' => 'inactive']);
+
+        $this->appendAuditLedger('users.deleted', [
+            'user_id' => (int) $id,
+        ]);
+
+        return redirect()->route('users.list')->with('success', 'User deleted successfully.');
     }
 }

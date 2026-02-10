@@ -1,15 +1,43 @@
-@if (session('success'))
-    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
-        <div class="toast align-items-center text-success bg-withe border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex" data-bs-dismiss="toast">
-                <div class="toast-body mt-3">
+@if(session('success') || session('warning') || session('error'))
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+        <div id="notificationToast" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
+            <div class="toast-body d-flex align-items-start gap-3">
+                @if(session('success'))
+                    <i class="fas fa-check-circle text-success" style="font-size: 1.5rem;"></i>
                     <div>
-                        <h6 class="text-center" style="font-weight: 100;"><i class="fa fa-check ms-4 me-4" style="font-size: 15px;"></i>{{ session('success') }}</h6>
+                        <div class="fw-bold">Success</div>
+                        <div class="text-muted">{{ session('success') }}</div>
                     </div>
-                </div>
+                @elseif(session('warning'))
+                    <i class="fas fa-exclamation-triangle text-warning" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <div class="fw-bold">Attention</div>
+                        <div class="text-muted">{{ session('warning') }}</div>
+                    </div>
+                @elseif(session('error'))
+                    <i class="fas fa-times-circle text-danger" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <div class="fw-bold">Error</div>
+                        <div class="text-muted">{{ session('error') }}</div>
+                    </div>
+                @endif
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var toastEl = document.getElementById('notificationToast');
+            if (toastEl) {
+                var toast = new bootstrap.Toast(toastEl);
+                toast.show();
+                setTimeout(function () {
+                    toast.hide();
+                }, 3000);
+            }
+        });
+    </script>
 @endif
 
 
@@ -51,19 +79,6 @@
                         <label class="form-label">Confirm New Password</label>
                         <input type="password" id="confirmpassword" name="confirmpassword" class="form-control" required>
                     </div>
-
-                    <!-- Session Errors -->
-                    @if(session('error'))
-                        <div class="alert alert-danger">
-                            {{ session('error') }}
-                        </div>
-                    @endif
-
-                    @if(session('success'))
-                        <div class="alert alert-success">
-                            {{ session('success') }}
-                        </div>
-                    @endif
 
                 </div>
 

@@ -42,30 +42,51 @@
                     </li>
             @endif
 
-            <!-- Residents with sublist -->
-            <li class="has-sub {{ request()->is('residents*') ? 'open active' : '' }}">
-                <a class="sublist-toggle">
-                    <i class="fas fa-user-friends"></i> <span>Residents</span>
-                </a>
+            @if (session('usr_role') == 'official')
+                <!-- Residents with sublist -->
+                <li class="has-sub {{ request()->is('residents*') ? 'open active' : '' }}">
+                    <a class="sublist-toggle">
+                        <i class="fas fa-user-friends"></i> <span>Residents</span>
+                    </a>
 
-                <ul class="sublist">
-                    <li class="{{ request()->is('residents') ? 'active' : '' }}">
-                        <a href="{{ url('/residents') }}">View Residents</a>
-                    </li>
+                    <ul class="sublist">
+                        <li class="{{ request()->is('residents') ? 'active' : '' }}">
+                            <a href="{{ url('/residents') }}">View Residents</a>
+                        </li>
 
-                    @if (in_array(session('usr_role'), ['admin', 'official']))
                         <li class="{{ request()->is('residents/create') ? 'active' : '' }}">
                             <a href="{{ url('/residents/create') }}">Add Resident</a>
                         </li>
-                    @endif
-                </ul>
-            </li>
+                    </ul>
+                </li>
+            @endif
 
             <!-- Payments -->
-            @if (in_array(session('usr_role'), ['admin', 'official']))
+            @if (in_array(session('usr_role'), ['admin', 'official', 'treasurer', 'resident']))
                 <li class="{{ request()->is('payments*') ? 'active' : '' }}">
                     <a href="{{ url('/payments') }}">
                         <i class="fas fa-money-bill-wave"></i> <span>Payments</span>
+                    </a>
+                </li>
+            @endif
+
+            @if (session('usr_role') == 'treasurer')
+                <li class="{{ request()->is('payments/bill/create') ? 'active' : '' }}">
+                    <a href="{{ url('/payments/bill/create') }}">
+                        <i class="fas fa-file-invoice"></i> <span>Generate Bill</span>
+                    </a>
+                </li>
+                <li class="{{ request()->is('payments/walkin/create') ? 'active' : '' }}">
+                    <a href="{{ url('/payments/walkin/create') }}">
+                        <i class="fas fa-cash-register"></i> <span>Walk-In Payment</span>
+                    </a>
+                </li>
+            @endif
+
+            @if (session('usr_role') == 'resident')
+                <li class="{{ request()->is('payments/create') ? 'active' : '' }}">
+                    <a href="{{ url('/payments/create') }}">
+                        <i class="fas fa-receipt"></i> <span>Submit Payment</span>
                     </a>
                 </li>
             @endif
@@ -78,19 +99,11 @@
                     <i class="fas fa-chart-line"></i> <span>Reports</span>
                 </a>
             </li>
-
-            <li><a href="">
-                <i class="fas fa-file-alt"></i> <span>Documents</span>
-            </a></li>
-            <li><a href="">
-                <i class="fas fa-question-circle"></i> <span>Help</span>
-            </a></li>
-            <li><a href="">
-                <i class="fas fa-envelope"></i> <span>Contact</span>
-            </a></li>
-            <li><a href="">
-                <i class="fas fa-info-circle"></i> <span>About</span>
-            </a></li>
+            <li class="{{ request()->is('audit-logs') ? 'active' : '' }}">
+                <a href="{{ url('/audit-logs') }}">
+                    <i class="fas fa-clipboard-list"></i> <span>Audit Logs</span>
+                </a>
+            </li>
             <li><a href="">
                 <i class="fas fa-cog"></i> <span>Settings</span>
             </a></li>

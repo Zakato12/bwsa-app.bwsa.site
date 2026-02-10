@@ -6,13 +6,6 @@
     <div>
         <h1>Add Barangay</h1>
 
-        @if(session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
-        @if(session('error'))
-            <div class="alert alert-danger">{{ session('error') }}</div>
-        @endif
-
         <form action="{{ route('barangays.store') }}" method="POST">
             @csrf
 

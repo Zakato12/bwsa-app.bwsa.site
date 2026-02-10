@@ -6,19 +6,13 @@
     <div>
         <h1>Add User</h1>
 
-        @if(session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
-        @if(session('error'))
-            <div class="alert alert-danger">{{ session('error') }}</div>
-        @endif
-
         <form action="{{ route('users.add') }}" method="POST" id="addUserForm">
             @csrf
 
             <div class="form-group">
                 <label for="username">Username:</label>
-                <input type="text" id="username" name="username" class="form-control" required>
+                <input type="text" id="username" name="username" class="form-control">
+                <small class="text-muted">Auto-generated for officials, treasurers, and residents.</small>
             </div>
 
             <div class="form-group">
@@ -28,7 +22,8 @@
 
             <div class="form-group">
                 <label for="password">Password:</label>
-                <input type="password" id="password" name="password" class="form-control" required>
+                <input type="password" id="password" name="password" class="form-control">
+                <small class="text-muted">Auto-generated for officials, treasurers, and residents.</small>
             </div>
 
             <div class="form-group">
@@ -66,16 +61,29 @@
     </div>
 
     <script>
-        document.getElementById('role_id').addEventListener('change', function() {
+        function toggleAutoCredentials() {
             var barangayGroup = document.getElementById('barangayGroup');
             var barangaySelect = document.getElementById('barangay_id');
-            if (this.value == '2' || this.value == '3' || this.value == '4') {
+            var username = document.getElementById('username');
+            var password = document.getElementById('password');
+
+            if (role_id.value == '2' || role_id.value == '3' || role_id.value == '4') {
                 barangayGroup.style.display = 'block';
                 barangaySelect.required = true;
+                username.value = '';
+                password.value = '';
+                username.disabled = true;
+                password.disabled = true;
             } else {
                 barangayGroup.style.display = 'none';
                 barangaySelect.required = false;
+                username.disabled = false;
+                password.disabled = false;
             }
-        });
+        }
+
+        var role_id = document.getElementById('role_id');
+        role_id.addEventListener('change', toggleAutoCredentials);
+        toggleAutoCredentials();
     </script>
 @endsection

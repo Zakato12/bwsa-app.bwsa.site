@@ -8,19 +8,13 @@
 
         <a href="{{ route('barangays.create') }}" class="btn btn-primary mb-3">Add Barangay</a>
 
-        @if(session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
-        @if(session('error'))
-            <div class="alert alert-danger">{{ session('error') }}</div>
-        @endif
-
         <table class="table table-striped">
             <thead>
                 <tr>
                     <th>ID</th>
                     <th>Name</th>
                     <th>Address</th>
+                    <th>Residents</th>
                     <th>Status</th>
                     <th>Payment Amount per Bill</th>
                     <th>Created At</th>
@@ -34,6 +28,7 @@
                     <td>{{ $barangay->id }}</td>
                     <td>{{ $barangay->name }}</td>
                     <td>{{ $barangay->address }}</td>
+                    <td>{{ $barangay->resident_count }}</td>
                     <td>{{ $barangay->status == 1 ? 'Active' : 'Inactive' }}</td>
                     <td>{{ $barangay->payment_amount_per_bill ?? 'N/A' }}</td>
                     <td>{{ $barangay->created_at }}</td>

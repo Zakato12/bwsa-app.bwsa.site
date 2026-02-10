@@ -9,18 +9,22 @@ class BarangayController extends Controller
 {
     public function index()
     {
-        if (session('usr_role') != 'admin') {
-            return redirect()->route('dashboard')->with('error', 'Unauthorized');
+        if ($redirect = $this->requireRole(['admin'])) {
+            return $redirect;
         }
 
-        $barangays = DB::table('barangays')->get();
+        $barangays = DB::table('barangays')
+            ->leftJoin('residents', 'residents.barangay_id', '=', 'barangays.id')
+            ->select('barangays.*', DB::raw('COUNT(residents.id) as resident_count'))
+            ->groupBy('barangays.id', 'barangays.brgy_code', 'barangays.name', 'barangays.address', 'barangays.status', 'barangays.payment_amount_per_bill', 'barangays.created_at', 'barangays.updated_at')
+            ->get();
         return view('pages.barangays.index', compact('barangays'));
     }
 
     public function create()
     {
-        if (session('usr_role') != 'admin') {
-            return redirect()->route('dashboard')->with('error', 'Unauthorized');
+        if ($redirect = $this->requireRole(['admin'])) {
+            return $redirect;
         }
 
         return view('pages.barangays.create');
@@ -28,8 +32,8 @@ class BarangayController extends Controller
 
     public function store(Request $request)
     {
-        if (session('usr_role') != 'admin') {
-            return redirect()->route('dashboard')->with('error', 'Unauthorized');
+        if ($redirect = $this->requireRole(['admin'])) {
+            return $redirect;
         }
 
         $validated = $request->validate([
@@ -53,8 +57,8 @@ class BarangayController extends Controller
 
     public function edit($id)
     {
-        if (session('usr_role') != 'admin') {
-            return redirect()->route('dashboard')->with('error', 'Unauthorized');
+        if ($redirect = $this->requireRole(['admin'])) {
+            return $redirect;
         }
 
         $barangay = DB::table('barangays')->where('id', $id)->first();
@@ -67,8 +71,8 @@ class BarangayController extends Controller
 
     public function update(Request $request, $id)
     {
-        if (session('usr_role') != 'admin') {
-            return redirect()->route('dashboard')->with('error', 'Unauthorized');
+        if ($redirect = $this->requireRole(['admin'])) {
+            return $redirect;
         }
 
         $validated = $request->validate([
@@ -91,8 +95,8 @@ class BarangayController extends Controller
 
     public function destroy($id)
     {
-        if (session('usr_role') != 'admin') {
-            return redirect()->route('dashboard')->with('error', 'Unauthorized');
+        if ($redirect = $this->requireRole(['admin'])) {
+            return $redirect;
         }
 
         DB::table('barangays')->where('id', $id)->delete();
