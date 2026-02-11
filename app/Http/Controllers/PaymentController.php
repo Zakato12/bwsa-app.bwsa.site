@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class PaymentController extends Controller
@@ -49,8 +51,15 @@ class PaymentController extends Controller
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'payment_method' => 'required|in:2',
-            'receipt' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'receipt' => 'required|file|mimes:jpeg,jpg,png|mimetypes:image/jpeg,image/png|max:2048',
         ]);
+
+        $receipt = $request->file('receipt');
+        if (!$receipt instanceof UploadedFile || !$this->isSafeReceiptImage($receipt)) {
+            throw ValidationException::withMessages([
+                'receipt' => 'Invalid receipt file. Upload a valid JPEG or PNG image only.',
+            ]);
+        }
 
         $userId = session('usr_id');
 
@@ -427,5 +436,39 @@ class PaymentController extends Controller
 
             return redirect()->back()->with('error', 'Receipt cannot be downloaded on current storage setup.');
         }
+    }
+
+    private function isSafeReceiptImage(UploadedFile $file): bool
+    {
+        if (!$file->isValid()) {
+            return false;
+        }
+
+        $path = $file->getRealPath();
+        if ($path === false || !is_readable($path)) {
+            return false;
+        }
+
+        $allowedMime = ['image/jpeg', 'image/png'];
+        $detectedMime = mime_content_type($path);
+        if (!in_array($detectedMime, $allowedMime, true)) {
+            return false;
+        }
+
+        if (function_exists('exif_imagetype')) {
+            $imageType = @exif_imagetype($path);
+            if (!in_array($imageType, [IMAGETYPE_JPEG, IMAGETYPE_PNG], true)) {
+                return false;
+            }
+        }
+
+        if (function_exists('getimagesize')) {
+            [$width, $height] = @getimagesize($path) ?: [0, 0];
+            if ($width < 100 || $height < 100) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

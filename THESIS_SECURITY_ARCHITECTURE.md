@@ -288,6 +288,17 @@ Request -> Route Middleware (session.auth, role)
   - `REFERRER_POLICY`
   - `PERMISSIONS_POLICY`
 
+**Gap #3: File Upload and Content Validation Hardening**
+- Resident GCash receipt upload is restricted to image files only:
+  - Allowed extensions: `jpg`, `jpeg`, `png`
+  - Allowed MIME types: `image/jpeg`, `image/png`
+  - Max file size: 2 MB
+- Server-side file-signature validation is enforced before storage:
+  - Detected MIME check (`mime_content_type`)
+  - Image magic-byte check (`exif_imagetype`)
+  - Basic dimension sanity check (`getimagesize`) to reject malformed payloads
+- Invalid uploads are rejected with validation errors before OCR processing.
+
 **Production Environment Baseline (.env)**
 ```env
 APP_ENV=production
