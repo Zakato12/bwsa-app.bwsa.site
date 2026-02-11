@@ -71,6 +71,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Security Baseline Enforcement
+    |--------------------------------------------------------------------------
+    |
+    | Enforce required production settings (e.g., APP_DEBUG=false, APP_KEY set,
+    | secure session cookies) and optionally block requests on failure.
+    |
+    */
+    'security_baseline_enabled' => env('SECURITY_BASELINE_ENABLED', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

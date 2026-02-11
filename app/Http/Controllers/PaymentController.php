@@ -110,7 +110,12 @@ class PaymentController extends Controller
             );
 
             if ($receiptPath) {
-                ProcessReceiptOcr::dispatch($paymentId, $receiptPath);
+                $mode = strtolower((string) env('OCR_PROCESSING_MODE', 'sync'));
+                if ($mode === 'queue') {
+                    ProcessReceiptOcr::dispatch($paymentId, $receiptPath);
+                } else {
+                    ProcessReceiptOcr::dispatchSync($paymentId, $receiptPath);
+                }
             }
         }
 

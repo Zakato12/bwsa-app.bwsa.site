@@ -63,34 +63,22 @@ class ProcessReceiptOcr implements ShouldQueue
             return;
         }
 
-        $command = 'python ' . escapeshellarg($pythonScript) . ' ' . escapeshellarg($fullPath) . ' 2>&1';
-        $output = \shell_exec($command);
-        if ($output === null) {
+        [$result, $error] = $this->runPythonOcr($pythonScript, $fullPath);
+        if ($result === null || isset($result['error'])) {
             DB::table('gcash_payments')->updateOrInsert(
                 ['payment_id' => $this->paymentId],
                 [
-                    'ocr_text' => 'OCR failed. Manual verification required.',
+                    'ocr_text' => 'OCR failed. Manual verification required. ' . ($result['error'] ?? $error ?? 'Error'),
                     'extracted_amount' => null,
                     'extracted_reference' => null,
                     'confidence_score' => 0.0,
                     'updated_at' => now(),
                 ]
             );
-            return;
-        }
-        $result = json_decode((string) $output, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE || isset($result['error'])) {
-            DB::table('gcash_payments')->updateOrInsert(
-                ['payment_id' => $this->paymentId],
-                [
-                    'ocr_text' => 'OCR failed. Manual verification required. ' . ($result['error'] ?? 'Error'),
-                    'extracted_amount' => null,
-                    'extracted_reference' => null,
-                    'confidence_score' => 0.0,
-                    'updated_at' => now(),
-                ]
-            );
+            Log::warning('ocr.execution_failed', [
+                'payment_id' => $this->paymentId,
+                'error' => $result['error'] ?? $error ?? 'unknown',
+            ]);
             return;
         }
 
@@ -104,6 +92,78 @@ class ProcessReceiptOcr implements ShouldQueue
                 'updated_at' => now(),
             ]
         );
+    }
+
+    private function runPythonOcr(string $pythonScript, string $fullPath): array
+    {
+        $errors = [];
+        foreach ($this->pythonCandidates() as $pythonBin) {
+            $command = $pythonBin . ' ' . escapeshellarg($pythonScript) . ' ' . escapeshellarg($fullPath) . ' 2>&1';
+            $output = \shell_exec($command);
+            if ($output === null) {
+                $errors[] = "{$pythonBin}: no output";
+                continue;
+            }
+
+            $result = $this->extractJsonPayload((string) $output);
+            if (is_array($result)) {
+                return [$result, null];
+            }
+
+            $snippet = trim((string) $output);
+            if ($snippet !== '') {
+                $errors[] = "{$pythonBin}: " . mb_substr($snippet, 0, 220);
+            }
+        }
+
+        if (empty($errors)) {
+            return [null, 'No python runtime could execute OCR script'];
+        }
+
+        return [null, implode(' | ', $errors)];
+    }
+
+    private function extractJsonPayload(string $output): ?array
+    {
+        $lines = preg_split('/\r\n|\r|\n/', $output) ?: [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] !== '{') {
+                continue;
+            }
+
+            $decoded = json_decode($line, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        $decoded = json_decode(trim($output), true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return $decoded;
+        }
+
+        return null;
+    }
+
+    private function pythonCandidates(): array
+    {
+        $candidates = [];
+
+        $preferred = trim((string) env('OCR_PYTHON_BINARY', ''));
+        if ($preferred !== '') {
+            $candidates[] = $preferred;
+        }
+
+        $fromEnv = trim((string) env('OCR_PYTHON_CANDIDATES', 'python,python3,py -3'));
+        foreach (explode(',', $fromEnv) as $entry) {
+            $entry = trim($entry);
+            if ($entry !== '') {
+                $candidates[] = $entry;
+            }
+        }
+
+        return array_values(array_unique($candidates));
     }
 
     private function receiptDisk(): string

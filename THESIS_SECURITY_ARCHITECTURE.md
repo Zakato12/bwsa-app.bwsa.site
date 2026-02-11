@@ -299,6 +299,35 @@ Request -> Route Middleware (session.auth, role)
   - Basic dimension sanity check (`getimagesize`) to reject malformed payloads
 - Invalid uploads are rejected with validation errors before OCR processing.
 
+**Gap #5: Secrets and Environment Hygiene (Production Guardrails)**
+- Added runtime baseline enforcement middleware for `web` and `api` requests.
+- In production mode, the baseline checks:
+  - `APP_DEBUG` must be `false`
+  - `APP_KEY` must be present/valid
+  - `SESSION_SECURE_COOKIE` should be `true`
+- On baseline failure:
+  - A critical security log is emitted (`security.baseline_failed`)
+  - Requests can be blocked (`503`) when `SECURITY_BASELINE_BLOCK_ON_FAIL=true`
+- Config/Env controls:
+  - `SECURITY_BASELINE_ENABLED`
+  - `SECURITY_BASELINE_BLOCK_ON_FAIL`
+
+**Gap #6: Monitoring and Incident Readiness**
+- Added centralized security event logging via a dedicated monitor helper.
+- Security-relevant events are emitted to a separate `security` log channel:
+  - Login failures and throttling
+  - Role authorization denials (403 paths)
+  - Session fingerprint mismatch (IP/User-Agent drift)
+  - Barangay scope and user-scope denials
+- Event payload includes incident-ready context:
+  - `event`, `user_id`, `role`, `ip`, `route`, plus action-specific fields
+- Added threshold-based alerting (critical logs) for anomaly spikes:
+  - Repeated login failures from same IP within time window
+  - Repeated role denials from same IP within time window
+- Log retention controls (environment-driven):
+  - `SECURITY_LOG_LEVEL`
+  - `SECURITY_LOG_DAYS`
+
 **Production Environment Baseline (.env)**
 ```env
 APP_ENV=production
@@ -313,6 +342,10 @@ SECURITY_HEADERS_ENABLED=true
 REFERRER_POLICY=strict-origin-when-cross-origin
 PERMISSIONS_POLICY="camera=(), microphone=(), geolocation=()"
 CSP_POLICY="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+SECURITY_BASELINE_ENABLED=true
+SECURITY_BASELINE_BLOCK_ON_FAIL=true
+SECURITY_LOG_LEVEL=warning
+SECURITY_LOG_DAYS=30
 ```
 
 **Apply Configuration After Update**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\SecurityMonitor;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
@@ -16,6 +17,7 @@ class Controller extends BaseController
     protected function requireLogin(): ?RedirectResponse
     {
         if (!Access::isAuthenticated()) {
+            SecurityMonitor::event('auth.require_login_denied');
             return redirect()->route('login')->with('error', 'Please login first.');
         }
 
@@ -29,6 +31,10 @@ class Controller extends BaseController
         }
 
         if (!Access::hasRole($roles)) {
+            SecurityMonitor::event('auth.require_role_denied', [
+                'required_roles' => $roles,
+                'current_role' => Access::currentRole(),
+            ]);
             return redirect()->route('dashboard')->with('error', 'Unauthorized');
         }
 
@@ -55,14 +61,27 @@ class Controller extends BaseController
 
         $actorBarangayId = Access::currentUserBarangayId();
         if (!$actorBarangayId) {
+            SecurityMonitor::event('auth.barangay_missing', [
+                'required_roles' => $roles,
+            ]);
             return redirect()->route('dashboard')->with('error', 'Barangay assignment required.');
         }
 
         if ($targetBarangayId !== null && (int) $targetBarangayId !== (int) $actorBarangayId) {
+            SecurityMonitor::event('auth.barangay_scope_denied', [
+                'target_barangay_id' => $targetBarangayId,
+                'actor_barangay_id' => $actorBarangayId,
+                'required_roles' => $roles,
+            ]);
             return redirect()->route('dashboard')->with('error', 'Unauthorized');
         }
 
         if ($targetUserId !== null && !Access::userInSameBarangay($targetUserId)) {
+                SecurityMonitor::event('auth.user_scope_denied', [
+                    'target_user_id' => $targetUserId,
+                    'actor_barangay_id' => $actorBarangayId,
+                    'required_roles' => $roles,
+                ]);
                 return redirect()->route('dashboard')->with('error', 'Unauthorized');
         }
 

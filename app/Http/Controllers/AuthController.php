@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\SecurityMonitor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,10 @@ class AuthController extends Controller
         $throttleKey = 'login:' . Str::lower((string) $usr_name) . '|' . $request->ip();
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+            SecurityMonitor::event('auth.login_throttled', [
+                'username' => $usr_name,
+                'seconds' => $seconds,
+            ]);
             return back()->with('error', "Too many login attempts. Try again in {$seconds} seconds.");
         }
 
@@ -55,6 +60,16 @@ class AuthController extends Controller
                 'username' => $usr_name,
                 'ip' => $request->ip(),
             ]);
+            SecurityMonitor::event('auth.login_failed', [
+                'username' => $usr_name,
+            ]);
+            SecurityMonitor::trackThreshold(
+                'login_failed:' . $request->ip(),
+                300,
+                10,
+                'alert.login_failed_spike',
+                ['username' => $usr_name]
+            );
             return redirect()->action([PageController::class, 'showLogin'])->with('error','Invalid Login Credentials.');
         }
     }

@@ -4,6 +4,16 @@ import cv2  # OpenCV for image processing
 import re  # Regular expressions for text parsing
 import sys  # System-specific parameters and functions
 import json  # For JSON output
+import os  # Environment variables
+
+tesseract_cmd = os.getenv("TESSERACT_CMD")
+if tesseract_cmd:
+    pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+try:
+    cv2.setLogLevel(0)
+except Exception:
+    pass
 
 def extract_gcash_info(image_path):
     """
