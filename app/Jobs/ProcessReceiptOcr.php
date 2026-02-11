@@ -46,15 +46,45 @@ class ProcessReceiptOcr implements ShouldQueue
             return;
         }
 
+        if (!function_exists('shell_exec')) {
+            Log::warning('ocr.shell_exec_disabled', [
+                'payment_id' => $this->paymentId,
+            ]);
+            DB::table('gcash_payments')->updateOrInsert(
+                ['payment_id' => $this->paymentId],
+                [
+                    'ocr_text' => 'OCR unavailable. Manual verification required.',
+                    'extracted_amount' => null,
+                    'extracted_reference' => null,
+                    'confidence_score' => 0.0,
+                    'updated_at' => now(),
+                ]
+            );
+            return;
+        }
+
         $command = 'python ' . escapeshellarg($pythonScript) . ' ' . escapeshellarg($fullPath) . ' 2>&1';
-        $output = shell_exec($command);
+        $output = \shell_exec($command);
+        if ($output === null) {
+            DB::table('gcash_payments')->updateOrInsert(
+                ['payment_id' => $this->paymentId],
+                [
+                    'ocr_text' => 'OCR failed. Manual verification required.',
+                    'extracted_amount' => null,
+                    'extracted_reference' => null,
+                    'confidence_score' => 0.0,
+                    'updated_at' => now(),
+                ]
+            );
+            return;
+        }
         $result = json_decode((string) $output, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || isset($result['error'])) {
             DB::table('gcash_payments')->updateOrInsert(
                 ['payment_id' => $this->paymentId],
                 [
-                    'ocr_text' => 'OCR failed: ' . ($result['error'] ?? 'Error'),
+                    'ocr_text' => 'OCR failed. Manual verification required. ' . ($result['error'] ?? 'Error'),
                     'extracted_amount' => null,
                     'extracted_reference' => null,
                     'confidence_score' => 0.0,

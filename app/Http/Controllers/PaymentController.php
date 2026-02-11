@@ -94,6 +94,7 @@ class PaymentController extends Controller
                 ['payment_id' => $paymentId],
                 [
                     'receipt_image_path' => $receiptPath,
+                    'ocr_text' => 'OCR pending. Manual verification may be required.',
                     'updated_at' => now(),
                     'created_at' => now(),
                 ]

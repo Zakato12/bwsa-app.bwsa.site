@@ -26,6 +26,7 @@
                         <th><a href="?sort_by=status&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '↑' : '↓') : '' }}</a></th>
                         <th>OCR Amount</th>
                         <th>Reference</th>
+                        <th>OCR Status</th>
                         <th>Receipt</th>
                         <th><a href="?sort_by=created_at&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '↑' : '↓') : '' }}</a></th>
                         <th>Actions</th>
@@ -53,6 +54,22 @@
                         </td>
                         <td>{{ $p->extracted_amount ? number_format($p->extracted_amount, 2) : '-' }}</td>
                         <td>{{ $p->extracted_reference ?? '-' }}</td>
+                        <td>
+                            @php
+                                $ocrText = strtolower((string) ($p->ocr_text ?? ''));
+                            @endphp
+                            @if($ocrText !== '' && str_contains($ocrText, 'manual verification required'))
+                                <span class="badge bg-warning text-dark">OCR unavailable - manual verification required</span>
+                            @elseif($ocrText !== '' && str_contains($ocrText, 'failed'))
+                                <span class="badge bg-warning text-dark">OCR failed - manual verification required</span>
+                            @elseif(!empty($p->extracted_amount) || !empty($p->extracted_reference))
+                                <span class="badge bg-success">OCR parsed</span>
+                            @elseif($ocrText !== '' && str_contains($ocrText, 'pending'))
+                                <span class="badge bg-secondary">OCR pending</span>
+                            @else
+                                <span class="badge bg-secondary">No OCR data</span>
+                            @endif
+                        </td>
                         <td>
                             @if($p->receipt_image_path)
                                 <a href="{{ route('payments.receipt', $p->id) }}" class="btn btn-outline-secondary btn-sm">View</a>
