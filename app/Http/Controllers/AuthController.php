@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Session as Session;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
-use Laravel\Prompts\Table;
 
 class AuthController extends Controller
 {
@@ -33,12 +32,15 @@ class AuthController extends Controller
             RateLimiter::clear($throttleKey);
 
             $request->session()->regenerate();
+            $request->session()->regenerateToken();
 
             $role = DB::table('roles')->where('id', $users->role_id)->value('name');
             session()->put('usr_id', $users->id);
             session()->put('usr_name', $users->username);
             session()->put('usr_role', $role);
             session()->put('last_activity', time());
+            session()->put('auth_ip', $request->ip());
+            session()->put('auth_ua_hash', hash('sha256', (string) $request->userAgent()));
 
             Log::info('auth.login', [
                 'user_id' => $users->id,
@@ -66,7 +68,7 @@ class AuthController extends Controller
 
         $request->session()->flush();
         $request->session()->invalidate();
-        $request->session()->regenerate();
+        $request->session()->regenerateToken();
 
         return redirect()->action([PageController::class,'showLogin'])->with('success', 'Successfuly signed out.');
     }

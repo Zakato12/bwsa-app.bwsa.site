@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SessionTimeout
 {
-    private int $timeoutSeconds = 300; // 5 minutes
+    private int $timeoutSeconds = 7200; // 120 minutes
 
     public function handle(Request $request, Closure $next): Response
     {

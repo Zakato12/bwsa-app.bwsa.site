@@ -261,6 +261,55 @@ Request -> Route Middleware (session.auth, role)
 - Rotate session ID after login and password change.
 - Add login throttling (rate limit) at controller entry points.
 
+### Gap Closure Status (Implemented)
+**Gap #1: Session and Authentication Hardening**
+- Session ID regeneration on login and password change.
+- CSRF token regeneration on login/logout transitions.
+- Session fingerprint binding:
+  - User-Agent hash is stored at login and revalidated on each protected request.
+  - Optional IP binding (`SESSION_BIND_IP`) invalidates session on IP mismatch.
+- Secure session-cookie controls are environment-driven:
+  - `SESSION_SECURE_COOKIE`
+  - `SESSION_SAME_SITE`
+  - `SESSION_EXPIRE_ON_CLOSE`
+  - `SESSION_BIND_IP`
+
+**Gap #2: Security Headers Hardening**
+- A dedicated middleware sets security headers for all web responses:
+  - `X-Frame-Options: SAMEORIGIN`
+  - `X-Content-Type-Options: nosniff`
+  - `Referrer-Policy`
+  - `Permissions-Policy`
+  - `Content-Security-Policy` (configurable baseline policy)
+  - `Strict-Transport-Security` (only for HTTPS requests)
+- Header behavior is configurable through environment variables:
+  - `SECURITY_HEADERS_ENABLED`
+  - `CSP_POLICY`
+  - `REFERRER_POLICY`
+  - `PERMISSIONS_POLICY`
+
+**Production Environment Baseline (.env)**
+```env
+APP_ENV=production
+APP_DEBUG=false
+
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=lax
+SESSION_EXPIRE_ON_CLOSE=true
+SESSION_BIND_IP=false
+
+SECURITY_HEADERS_ENABLED=true
+REFERRER_POLICY=strict-origin-when-cross-origin
+PERMISSIONS_POLICY="camera=(), microphone=(), geolocation=()"
+CSP_POLICY="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+```
+
+**Apply Configuration After Update**
+```bash
+php artisan optimize:clear
+php artisan config:cache
+```
+
 ### Authorization
 - Enforce role gating via route middleware.
 - Enforce barangay scope via controller‑level checks.
@@ -285,6 +334,7 @@ Request -> Route Middleware (session.auth, role)
 ### Transport Security
 - Enforce TLS 1.2+ and HSTS.
 - Redirect HTTP to HTTPS at the proxy.
+- HSTS is emitted by application middleware when the request is HTTPS.
 
 ### Secrets and Configuration
 - Keep `.env` out of version control.

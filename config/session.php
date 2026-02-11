@@ -33,7 +33,7 @@ return [
 
     'lifetime' => env('SESSION_LIFETIME', 120),
 
-    'expire_on_close' => false,
+    'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -168,7 +168,7 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    'secure' => env('SESSION_SECURE_COOKIE', env('APP_ENV') === 'production'),
 
     /*
     |--------------------------------------------------------------------------
@@ -196,7 +196,7 @@ return [
     |
     */
 
-    'same_site' => 'lax',
+    'same_site' => env('SESSION_SAME_SITE', 'lax'),
 
     /*
     |--------------------------------------------------------------------------
@@ -210,5 +210,16 @@ return [
     */
 
     'partitioned' => false,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session IP Binding
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the current request IP must match the IP stored at login.
+    | Keep this disabled if users are behind unstable proxy IP rotation.
+    |
+    */
+    'bind_ip' => env('SESSION_BIND_IP', false),
 
 ];
