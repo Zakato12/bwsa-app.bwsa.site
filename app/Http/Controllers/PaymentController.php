@@ -7,9 +7,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class PaymentController extends Controller
 {
+    private function receiptDisk(): string
+    {
+        $configured = env('RECEIPT_DISK', 'private');
+        $disks = array_keys((array) config('filesystems.disks', []));
+        if (in_array($configured, $disks, true)) {
+            return $configured;
+        }
+
+        // Fallback for shared hosting misconfiguration.
+        return in_array('public', $disks, true) ? 'public' : config('filesystems.default', 'local');
+    }
+
     public function create()
     {
         if ($redirect = $this->requireRole(['resident'])) {
@@ -74,7 +87,7 @@ class PaymentController extends Controller
         if ($request->payment_method == 2) {
             $receiptPath = null;
             if ($request->hasFile('receipt')) {
-                $receiptPath = $request->file('receipt')->store('receipts', 'private');
+                $receiptPath = $request->file('receipt')->store('receipts', $this->receiptDisk());
             }
 
             DB::table('gcash_payments')->updateOrInsert(
@@ -224,13 +237,16 @@ class PaymentController extends Controller
             return $redirect;
         }
 
-        $residents = DB::table('residents')
-            ->join('users', 'residents.user_id', '=', 'users.id')
-            ->where('residents.barangay_id', $barangayId)
-            ->select('users.id', 'users.full_name', 'users.username')
-            ->get();
+        $barangay = DB::table('barangays')
+            ->select('id', 'name', 'payment_amount_per_bill')
+            ->where('id', $barangayId)
+            ->first();
 
-        return view('payments.create_bill', compact('residents'));
+        $residentCount = DB::table('residents')
+            ->where('barangay_id', $barangayId)
+            ->count();
+
+        return view('payments.create_bill', compact('barangay', 'residentCount'));
     }
 
     public function createWalkIn()
@@ -310,35 +326,62 @@ class PaymentController extends Controller
             return redirect()->route('dashboard')->with('error', 'Barangay assignment required.');
         }
 
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
+        $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
         ]);
 
-        if ($redirect = $this->requireRoleInBarangay(['treasurer'], (int) $request->user_id, (int) $barangayId)) {
-            return $redirect;
+        $residentUserIds = DB::table('residents')
+            ->where('barangay_id', $barangayId)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (empty($residentUserIds)) {
+            return redirect()->back()->with('error', 'No residents found in your barangay.');
         }
 
-        $paymentId = DB::table('payments')->insertGetId([
-            'user_id' => $request->user_id,
-            'amount' => $request->amount,
-            'payment_method' => 0, // 0 for bill
-            'status' => 0, // 0 for bill generated
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $existingUnpaid = DB::table('payments')
+            ->whereIn('user_id', $residentUserIds)
+            ->where('status', 0)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
-        Log::info('payments.bill_created', [
+        $billableUserIds = array_values(array_diff($residentUserIds, $existingUnpaid));
+        $now = now();
+        $rows = [];
+        foreach ($billableUserIds as $userId) {
+            $rows[] = [
+                'user_id' => $userId,
+                'amount' => $validated['amount'],
+                'payment_method' => 0, // 0 for bill
+                'status' => 0, // 0 for bill generated
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if (!empty($rows)) {
+            DB::table('payments')->insert($rows);
+        }
+
+        Log::info('payments.bill_batch_created', [
             'actor_id' => session('usr_id'),
-            'payment_id' => $paymentId,
-            'user_id' => (int) $request->user_id,
+            'barangay_id' => $barangayId,
+            'generated_count' => count($rows),
+            'skipped_count' => count($existingUnpaid),
         ]);
-        $this->appendAuditLedger('payments.bill_created', [
-            'payment_id' => $paymentId,
-            'user_id' => (int) $request->user_id,
+        $this->appendAuditLedger('payments.bill_batch_created', [
+            'barangay_id' => $barangayId,
+            'generated_count' => count($rows),
+            'skipped_count' => count($existingUnpaid),
+            'amount' => (float) $validated['amount'],
         ]);
 
-        return redirect()->route('payments.index')->with('success', 'Bill generated.');
+        return redirect()->route('payments.index')->with(
+            'success',
+            'Bills generated: ' . count($rows) . '. Skipped (already unpaid): ' . count($existingUnpaid) . '.'
+        );
     }
 
     public function receipt($id)
@@ -366,10 +409,22 @@ class PaymentController extends Controller
             return redirect()->route('dashboard')->with('error', 'Unauthorized');
         }
 
-        if (!Storage::disk('private')->exists($payment->receipt_image_path)) {
+        $disk = $this->receiptDisk();
+        if (!Storage::disk($disk)->exists($payment->receipt_image_path)) {
             return redirect()->back()->with('error', 'Receipt file missing.');
         }
 
-        return Storage::disk('private')->download($payment->receipt_image_path);
+        try {
+            return Storage::disk($disk)->download($payment->receipt_image_path);
+        } catch (Throwable $e) {
+            Log::error('payments.receipt_download_failed', [
+                'payment_id' => (int) $id,
+                'disk' => $disk,
+                'path' => $payment->receipt_image_path,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()->with('error', 'Receipt cannot be downloaded on current storage setup.');
+        }
     }
 }

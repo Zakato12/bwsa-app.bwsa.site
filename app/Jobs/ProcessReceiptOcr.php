@@ -9,6 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ProcessReceiptOcr implements ShouldQueue
 {
@@ -25,7 +26,8 @@ class ProcessReceiptOcr implements ShouldQueue
 
     public function handle(): void
     {
-        $fullPath = storage_path('app/private/' . $this->receiptPath);
+        $disk = $this->receiptDisk();
+        $fullPath = Storage::disk($disk)->path($this->receiptPath);
         $pythonScript = resource_path('python/ocr.py');
 
         if (!file_exists($fullPath) || !file_exists($pythonScript)) {
@@ -72,5 +74,16 @@ class ProcessReceiptOcr implements ShouldQueue
                 'updated_at' => now(),
             ]
         );
+    }
+
+    private function receiptDisk(): string
+    {
+        $configured = env('RECEIPT_DISK', 'private');
+        $disks = array_keys((array) config('filesystems.disks', []));
+        if (in_array($configured, $disks, true)) {
+            return $configured;
+        }
+
+        return in_array('public', $disks, true) ? 'public' : config('filesystems.default', 'local');
     }
 }
