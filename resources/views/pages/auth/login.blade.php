@@ -64,17 +64,6 @@
                     @enderror
                 </div>
 
-                <div class="form-options">
-                    <label class="remember-wrapper">
-                        <input type="checkbox" id="remember" name="remember">
-                        <span class="checkbox-label">
-                            <span class="checkmark"></span>
-                            Remember me
-                        </span>
-                    </label>
-                    <a href="#" class="forgot-password">Forgot password?</a>
-                </div>
-
                 <button type="submit" class="login-btn">
                     <span class="btn-text">Sign In</span>
                     <span class="btn-loader"></span>
