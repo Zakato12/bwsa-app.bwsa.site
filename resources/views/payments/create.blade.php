@@ -20,16 +20,14 @@
                             <label for="amount" class="form-label">Amount</label>
                             <input type="number" step="0.01" class="form-control" name="amount" value="{{ $bill ? $bill->amount : '' }}" required {{ $bill ? 'readonly' : '' }}>
                         </div>
+                        <input type="hidden" name="payment_method" value="2">
                         <div class="mb-3">
-                            <label for="payment_method" class="form-label">Payment Method</label>
-                            <select class="form-select" name="payment_method" required>
-                                <option value="1">Cash</option>
-                                <option value="2">GCash</option>
-                            </select>
+                            <label class="form-label">Payment Method</label>
+                            <input type="text" class="form-control" value="GCash" readonly>
                         </div>
-                        <div class="mb-3" id="receipt" style="display:none;">
+                        <div class="mb-3">
                             <label for="receipt" class="form-label">Receipt</label>
-                            <input type="file" class="form-control" name="receipt" accept="image/*">
+                            <input type="file" class="form-control" name="receipt" accept="image/*" required>
                         </div>
                         <button type="submit" class="btn btn-primary">{{ $bill ? 'Pay Bill' : 'Submit Payment' }}</button>
                         <a href="{{ route('payments.index') }}" class="btn btn-secondary">Cancel</a>
@@ -40,9 +38,4 @@
     </div>
 </div>
 
-<script>
-document.querySelector('[name=payment_method]').addEventListener('change', function() {
-    document.getElementById('receipt').style.display = this.value == '2' ? 'block' : 'none';
-});
-</script>
 @endsection

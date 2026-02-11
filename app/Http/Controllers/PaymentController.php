@@ -48,8 +48,8 @@ class PaymentController extends Controller
 
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'required|in:1,2',
-            'receipt' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'payment_method' => 'required|in:2',
+            'receipt' => 'required|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         $userId = session('usr_id');
@@ -68,7 +68,7 @@ class PaymentController extends Controller
 
             DB::table('payments')->where('id', $request->bill_id)->update([
                 'payment_method' => $request->payment_method,
-                'status' => $request->payment_method == 1 ? 2 : 1,
+                'status' => 1,
                 'updated_at' => now(),
             ]);
             $paymentId = $request->bill_id;
@@ -78,7 +78,7 @@ class PaymentController extends Controller
                 'user_id' => $userId,
                 'amount' => $request->amount,
                 'payment_method' => $request->payment_method,
-                'status' => $request->payment_method == 1 ? 2 : 1,
+                'status' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
