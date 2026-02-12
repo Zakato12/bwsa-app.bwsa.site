@@ -91,23 +91,34 @@
                 </li>
             @endif
 
-            @if (session('usr_role') == 'admin')
+            @if (in_array(session('usr_role'), ['official', 'treasurer']))
+                <li class="has-sub {{ request()->is('reports*') ? 'open active' : '' }}">
+                    <a class="sublist-toggle">
+                        <i class="fas fa-chart-line"></i> <span>Reports</span>
+                    </a>
 
-            <!-- Reports -->
-            <li class="{{ request()->is('reports*') ? 'active' : '' }}">
-                <a href="{{ url('/reports') }}">
-                    <i class="fas fa-chart-line"></i> <span>Reports</span>
-                </a>
-            </li>
+                    <ul class="sublist">
+                        @if (session('usr_role') == 'official')
+                            <li class="{{ request()->is('reports/residents') ? 'active' : '' }}">
+                                <a href="{{ route('reports.residents') }}">Resident List Report</a>
+                            </li>
+                        @endif
+
+                        @if (session('usr_role') == 'treasurer')
+                            <li class="{{ request()->is('reports/payments') ? 'active' : '' }}">
+                                <a href="{{ route('reports.payments') }}">Payment Report</a>
+                            </li>
+                        @endif
+                    </ul>
+                </li>
+            @endif
+
+            @if (session('usr_role') == 'admin')
             <li class="{{ request()->is('audit-logs') ? 'active' : '' }}">
                 <a href="{{ url('/audit-logs') }}">
                     <i class="fas fa-clipboard-list"></i> <span>Audit Logs</span>
                 </a>
             </li>
-            <li><a href="">
-                <i class="fas fa-cog"></i> <span>Settings</span>
-            </a></li>
-        
             @endif
 
             <li>

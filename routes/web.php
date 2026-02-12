@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\BarangayController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\ReportController;
 
 // LOGIN ROUTES
 Route::get('/', [PageController::class,'showLogin']);
@@ -50,4 +51,8 @@ Route::middleware(['session.auth', 'session.timeout'])->group(function () {
     // AUDIT LOGS
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit.logs')->middleware('role:admin');
     Route::post('/audit-logs/test', [AuditLogController::class, 'test'])->name('audit.logs.test')->middleware('role:admin');
+
+    // REPORTS
+    Route::get('/reports/residents', [ReportController::class, 'residents'])->name('reports.residents')->middleware('role:official');
+    Route::get('/reports/payments', [ReportController::class, 'payments'])->name('reports.payments')->middleware('role:treasurer');
 });
