@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class BarangayController extends Controller
 {
@@ -48,6 +49,7 @@ class BarangayController extends Controller
 
         DB::table('barangays')->insert([
             'name' => $validated['name'],
+            'brgy_code' => $this->generateBarangayCode($validated['name']),
             'address' => $validated['address'],
             'status' => $validated['status'],
             'payment_amount_per_bill' => $validated['payment_amount_per_bill'],
@@ -85,8 +87,14 @@ class BarangayController extends Controller
             'payment_amount_per_bill' => 'required|numeric|min:0',
         ]);
 
+        $barangay = DB::table('barangays')->where('id', $id)->first();
+        if (!$barangay) {
+            return redirect()->route('barangays.index')->with('error', 'Barangay not found');
+        }
+
         DB::table('barangays')->where('id', $id)->update([
             'name' => $validated['name'],
+            'brgy_code' => $barangay->brgy_code ?: $this->generateBarangayCode($validated['name'], (int) $id),
             'address' => $validated['address'],
             'status' => $validated['status'],
             'payment_amount_per_bill' => $validated['payment_amount_per_bill'],
@@ -102,7 +110,43 @@ class BarangayController extends Controller
             return $redirect;
         }
 
-        DB::table('barangays')->where('id', $id)->delete();
+        DB::table('barangays')->where('id', $id)->update([
+            'status' => 'inactive',
+            'updated_at' => now(),
+        ]);
         return redirect()->route('barangays.index')->with('success', 'Barangay deleted successfully');
+    }
+
+    private function generateBarangayCode(string $name, ?int $excludeId = null): string
+    {
+        $normalized = strtoupper((string) preg_replace('/[^A-Za-z]/', '', $name));
+        $consonants = preg_replace('/[AEIOU]/', '', $normalized);
+        $base = Str::substr((string) $consonants, 0, 4);
+
+        if (Str::length((string) $base) < 3) {
+            $base = Str::substr($normalized, 0, 4);
+        }
+
+        if (Str::length((string) $base) < 3) {
+            $base = str_pad((string) $base, 3, 'X');
+        }
+
+        $base = Str::upper((string) $base);
+        $candidate = $base;
+        $suffix = 2;
+
+        while (true) {
+            $exists = DB::table('barangays')
+                ->when($excludeId !== null, fn ($q) => $q->where('id', '!=', $excludeId))
+                ->where('brgy_code', $candidate)
+                ->exists();
+
+            if (!$exists) {
+                return $candidate;
+            }
+
+            $candidate = Str::substr($base, 0, max(1, 8 - strlen((string) $suffix))) . $suffix;
+            $suffix++;
+        }
     }
 }

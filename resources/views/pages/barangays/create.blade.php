@@ -12,6 +12,7 @@
             <div class="form-group">
                 <label for="name">Barangay Name:</label>
                 <input type="text" id="name" name="name" class="form-control" required>
+                <small class="text-muted">Barangay code is auto-generated from the name.</small>
             </div>
 
             <div class="form-group">

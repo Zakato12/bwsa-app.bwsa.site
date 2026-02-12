@@ -13,6 +13,7 @@
                 <tr>
                     <th>ID</th>
                     <th>Name</th>
+                    <th>Code</th>
                     <th>Address</th>
                     <th>Residents</th>
                     <th>Status</th>
@@ -27,6 +28,7 @@
                 <tr>
                     <td>{{ $barangay->id }}</td>
                     <td>{{ $barangay->name }}</td>
+                    <td>{{ $barangay->brgy_code ?? 'N/A' }}</td>
                     <td>{{ $barangay->address }}</td>
                     <td>{{ $barangay->resident_count }}</td>
                     <td>{{ $barangay->status == 1 ? 'Active' : 'Inactive' }}</td>

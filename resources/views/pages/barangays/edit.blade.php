@@ -16,6 +16,12 @@
             </div>
 
             <div class="form-group">
+                <label for="brgy_code">Barangay Code:</label>
+                <input type="text" id="brgy_code" class="form-control" value="{{ $barangay->brgy_code ?? 'N/A' }}" readonly>
+                <small class="text-muted">Auto-generated code. Existing code stays unchanged.</small>
+            </div>
+
+            <div class="form-group">
                 <label for="address">Address:</label>
                 <input type="text" id="address" name="address" class="form-control" value="{{ $barangay->address }}" required>
             </div>
