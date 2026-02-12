@@ -328,6 +328,20 @@ Request -> Route Middleware (session.auth, role)
   - `SECURITY_LOG_LEVEL`
   - `SECURITY_LOG_DAYS`
 
+**Gap #7: Transport and Deployment Hardening**
+- Added transport-enforcement middleware:
+  - HTTP requests are redirected to HTTPS (`301`) when `APP_FORCE_HTTPS=true`
+  - Enforcement is skipped for local/testing environments
+- Added proxy-trust hardening for hosted deployments:
+  - `TRUSTED_PROXIES` for explicit proxy IP allow-list
+  - `TRUSTED_PROXY_HEADERS` (`ALL`, `AWS_ELB`, `FORWARDED`) for correct scheme/host detection
+- Existing HSTS support remains active for secure requests via security-headers middleware.
+- Deployment controls formalized:
+  - Use least-privileged database account (no schema/admin rights for app runtime user)
+  - Implement encrypted automated backups and periodic restore tests
+  - Maintain patch cadence for PHP, Laravel, OpenSSL, and host OS packages
+  - Keep production `APP_DEBUG=false` and rotate secrets on compromise events
+
 **Production Environment Baseline (.env)**
 ```env
 APP_ENV=production
@@ -346,6 +360,9 @@ SECURITY_BASELINE_ENABLED=true
 SECURITY_BASELINE_BLOCK_ON_FAIL=true
 SECURITY_LOG_LEVEL=warning
 SECURITY_LOG_DAYS=30
+APP_FORCE_HTTPS=true
+TRUSTED_PROXIES=127.0.0.1
+TRUSTED_PROXY_HEADERS=ALL
 ```
 
 **Apply Configuration After Update**
