@@ -148,8 +148,8 @@ class PaymentController extends Controller
         $sortOrder = $sortOrder === 'asc' ? 'asc' : 'desc';
 
         if (in_array(session('usr_role'), ['admin', 'official', 'treasurer'])) {
-            // Show all payments
-            $query = DB::table('payments')
+            // Show separate bills and payments
+            $baseQuery = DB::table('payments')
                 ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
                 ->leftJoin('users', 'payments.user_id', '=', 'users.id')
                 ->select('payments.*', 'gcash_payments.ocr_text', 'gcash_payments.extracted_amount', 'gcash_payments.extracted_reference', 'gcash_payments.confidence_score', 'gcash_payments.receipt_image_path', 'gcash_payments.verified_at', 'users.username as user_name');
@@ -159,12 +159,22 @@ class PaymentController extends Controller
                 if (!$barangayId) {
                     return redirect()->route('dashboard')->with('error', 'Barangay assignment required.');
                 }
-                $query->join('residents', 'residents.user_id', '=', 'payments.user_id')
+                $baseQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
                     ->where('residents.barangay_id', $barangayId);
             }
 
-            $payments = $query->orderBy($sortBy, $sortOrder)->get();
-            return view('payments.index', compact('payments', 'sortBy', 'sortOrder'));
+            $bills = (clone $baseQuery)
+                ->where('payments.status', 0)
+                ->where('payments.payment_method', 0)
+                ->orderBy($sortBy, $sortOrder)
+                ->get();
+
+            $payments = (clone $baseQuery)
+                ->where('payments.status', '>', 0)
+                ->orderBy($sortBy, $sortOrder)
+                ->get();
+
+            return view('payments.index', compact('bills', 'payments', 'sortBy', 'sortOrder'));
         } else {
             // For residents: separate bills and payment history
             $bills = DB::table('payments')
