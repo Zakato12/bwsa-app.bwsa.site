@@ -14,9 +14,12 @@ class BarangayController extends Controller
         }
 
         $barangays = DB::table('barangays')
-            ->leftJoin('residents', 'residents.barangay_id', '=', 'barangays.id')
-            ->select('barangays.*', DB::raw('COUNT(residents.id) as resident_count'))
-            ->groupBy('barangays.id', 'barangays.brgy_code', 'barangays.name', 'barangays.address', 'barangays.status', 'barangays.payment_amount_per_bill', 'barangays.created_at', 'barangays.updated_at')
+            ->select('barangays.*')
+            ->selectSub(function ($query) {
+                $query->from('residents')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('residents.barangay_id', 'barangays.id');
+            }, 'resident_count')
             ->get();
         return view('pages.barangays.index', compact('barangays'));
     }
