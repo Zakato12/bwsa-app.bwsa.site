@@ -1,78 +1,92 @@
-# Import necessary libraries
-import pytesseract  # For OCR (Optical Character Recognition)
-import cv2  # OpenCV for image processing
-import re  # Regular expressions for text parsing
-import sys  # System-specific parameters and functions
-import json  # For JSON output
-import os  # Environment variables
+import json
+import os
+import re
+import subprocess
+import sys
 
-tesseract_cmd = os.getenv("TESSERACT_CMD")
-if tesseract_cmd:
-    pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 
-try:
-    cv2.setLogLevel(0)
-except Exception:
-    pass
+def extract_amount(text):
+    # Prefer explicit amount keywords first.
+    patterns = [
+        r"(?:Amount|Total|Paid)\s*[:\-]?\s*(?:PHP|Php|P)?\s*([0-9]+(?:\.[0-9]{2})?)",
+        r"(?:PHP|Php|P)\s*([0-9]+(?:\.[0-9]{2})?)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            try:
+                return float(match.group(1))
+            except Exception:
+                pass
+
+    generic = re.search(r"([0-9]+(?:\.[0-9]{2})?)", text)
+    if generic:
+        try:
+            return float(generic.group(1))
+        except Exception:
+            return None
+    return None
+
+
+def extract_reference(text):
+    patterns = [
+        r"(?:Ref(?:erence)?\s*(?:No\.?|Number)?\s*[:\-]?\s*)([A-Z0-9\-]{6,})",
+        r"(?:Transaction\s*(?:ID|No\.?)\s*[:\-]?\s*)([A-Z0-9\-]{6,})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    return None
+
+
+def run_tesseract(image_path):
+    tesseract_cmd = os.getenv("TESSERACT_CMD", "tesseract")
+    cmd = [tesseract_cmd, image_path, "stdout", "-l", "eng"]
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None, "tesseract binary not found"
+    except Exception as exc:
+        return None, str(exc)
+
+    if proc.returncode != 0:
+        err = proc.stderr.strip() or "tesseract failed"
+        return None, err
+
+    return proc.stdout or "", None
+
 
 def extract_gcash_info(image_path):
-    """
-    Extract payment information from a GCash receipt image using OCR.
+    if not os.path.isfile(image_path):
+        return {"error": "Image not found"}
 
-    Args:
-        image_path (str): Path to the receipt image file
+    text, err = run_tesseract(image_path)
+    if err:
+        return {"error": err}
 
-    Returns:
-        dict: Extracted data including text, amount, reference, and confidence,
-              or error message if processing fails
-    """
-    try:
-        # Load the image from the given path
-        image = cv2.imread(image_path)
-        if image is None:
-            return {"error": "Image not found"}
+    amount = extract_amount(text)
+    reference = extract_reference(text)
 
-        # Convert to grayscale for better OCR accuracy
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return {
+        "text": text,
+        "amount": amount,
+        "reference": reference,
+        "confidence": 0.7,
+    }
 
-        # Apply thresholding to create a binary image (black and white)
-        # This helps improve OCR accuracy on receipts
-        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # Perform OCR on the processed image
-        text = pytesseract.image_to_string(thresh, lang='eng')
-
-        # Extract amount using regex pattern (looks for PHP prefix or just numbers with decimals)
-        amount_match = re.search(r'(?:PHP\s*)?(\d+(?:\.\d{2})?)', text)
-        amount = float(amount_match.group(1)) if amount_match else None
-
-        # Extract reference number using regex (looks for "Ref No", "Reference", etc.)
-        ref_match = re.search(r'(?:Ref(?:erence)?\s*(?:No\.?|Number)?:?\s*)(\w+)', text, re.IGNORECASE)
-        reference = ref_match.group(1) if ref_match else None
-
-        # Set a default confidence score (in a real implementation, this could be calculated)
-        confidence = 0.8
-
-        # Return the extracted information
-        return {
-            "text": text,  # Full OCR text
-            "amount": amount,  # Extracted payment amount
-            "reference": reference,  # Extracted reference number
-            "confidence": confidence  # OCR confidence score
-        }
-    except Exception as e:
-        # Return error information if anything goes wrong
-        return {"error": str(e)}
-
-# Main execution block (runs when script is called directly)
 if __name__ == "__main__":
-    # Check if exactly one argument (image path) is provided
     if len(sys.argv) != 2:
         print(json.dumps({"error": "Usage: python ocr.py <image_path>"}))
         sys.exit(1)
 
-    # Extract information from the provided image
     result = extract_gcash_info(sys.argv[1])
-
-    # Output the result as JSON
     print(json.dumps(result))

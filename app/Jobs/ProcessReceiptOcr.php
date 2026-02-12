@@ -46,23 +46,6 @@ class ProcessReceiptOcr implements ShouldQueue
             return;
         }
 
-        if (!function_exists('shell_exec')) {
-            Log::warning('ocr.shell_exec_disabled', [
-                'payment_id' => $this->paymentId,
-            ]);
-            DB::table('gcash_payments')->updateOrInsert(
-                ['payment_id' => $this->paymentId],
-                [
-                    'ocr_text' => 'OCR unavailable. Manual verification required.',
-                    'extracted_amount' => null,
-                    'extracted_reference' => null,
-                    'confidence_score' => 0.0,
-                    'updated_at' => now(),
-                ]
-            );
-            return;
-        }
-
         [$result, $error] = $this->runPythonOcr($pythonScript, $fullPath);
         if ($result === null || isset($result['error'])) {
             DB::table('gcash_payments')->updateOrInsert(
@@ -99,9 +82,9 @@ class ProcessReceiptOcr implements ShouldQueue
         $errors = [];
         foreach ($this->pythonCandidates() as $pythonBin) {
             $command = $pythonBin . ' ' . escapeshellarg($pythonScript) . ' ' . escapeshellarg($fullPath) . ' 2>&1';
-            $output = \shell_exec($command);
+            [$output, $execError] = $this->executeCommand($command);
             if ($output === null) {
-                $errors[] = "{$pythonBin}: no output";
+                $errors[] = "{$pythonBin}: " . ($execError ?? 'execution unavailable');
                 continue;
             }
 
@@ -121,6 +104,30 @@ class ProcessReceiptOcr implements ShouldQueue
         }
 
         return [null, implode(' | ', $errors)];
+    }
+
+    private function executeCommand(string $command): array
+    {
+        if (function_exists('shell_exec')) {
+            $output = \shell_exec($command);
+            if ($output !== null) {
+                return [$output, null];
+            }
+        }
+
+        if (function_exists('exec')) {
+            $lines = [];
+            $exitCode = 0;
+            @exec($command, $lines, $exitCode);
+            $output = implode(PHP_EOL, $lines);
+            if ($output !== '' || $exitCode === 0) {
+                return [$output, null];
+            }
+
+            return [null, "exec failed with code {$exitCode}"];
+        }
+
+        return [null, 'shell_exec/exec are disabled'];
     }
 
     private function extractJsonPayload(string $output): ?array
