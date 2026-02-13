@@ -166,9 +166,10 @@ class ResidentController extends Controller
         if ($redirect = $this->requireRoleInBarangay(['official'], (int) $resident->user_id)) {
             return $redirect;
         }
-
-        DB::table('residents')->where('id', $id)->delete();
-        DB::table('users')->where('id', $resident->user_id)->delete();
+        DB::table('users')->where('id', $resident->user_id)->update([
+            'status' => 'inactive',
+            'updated_at' => now(),
+        ]);
 
         return redirect()->route('residents.index')->with('success', 'Resident deleted successfully');
     }

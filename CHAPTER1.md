@@ -38,3 +38,28 @@ This study provides a defensible RBAC design tailored to local governance workfl
    - Security tests: attempt unauthorized access across barangays and roles.
    - Functional tests: validate normal workflows (billing, payment, verification).
    - Performance: measure response time before/after security enforcement.
+
+## 1.8 Defense Talking Points: OCR Limitation and Future Improvements
+### Why the System Is Defensible Without OCR
+- OCR is implemented as an enhancement, not a hard dependency.
+- Core workflows are fully operational without OCR:
+  - bill generation,
+  - resident payment submission,
+  - treasurer verification and approval,
+  - reporting.
+- If OCR is unavailable, the system falls back to manual receipt validation by authorized personnel, preserving service continuity and control.
+
+### Current Limitation
+- OCR accuracy may vary due to image quality, lighting, and receipt format differences.
+- OCR output is assistive data only and is not treated as final authority for approval decisions.
+
+### Future Improvements
+1. Improve OCR reliability through better image preprocessing and model tuning.
+2. Add confidence thresholds and stricter exception handling for low-confidence extraction.
+3. Expand support for additional receipt formats and payment providers.
+4. Optimize asynchronous OCR processing for faster and more scalable verification.
+
+### Suggested Q&A Response
+If asked, "Why include OCR if the system works without it?"
+- OCR reduces verification time and clerical workload.
+- The system is intentionally designed so governance, correctness, and approvals do not depend on OCR availability.
