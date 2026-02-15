@@ -446,7 +446,12 @@ class PaymentController extends Controller
         }
 
         try {
-            return Storage::disk($disk)->download($payment->receipt_image_path);
+            if (request()->boolean('download')) {
+                return Storage::disk($disk)->download($payment->receipt_image_path);
+            }
+
+            $absolutePath = Storage::disk($disk)->path($payment->receipt_image_path);
+            return response()->file($absolutePath);
         } catch (Throwable $e) {
             Log::error('payments.receipt_download_failed', [
                 'payment_id' => (int) $id,

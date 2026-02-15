@@ -101,13 +101,22 @@
                                         <span class="badge bg-secondary">No OCR data</span>
                                     @endif
                                 </td>
-                                <td>
-                                    @if($p->receipt_image_path)
-                                        <a href="{{ route('payments.receipt', $p->id) }}" class="btn btn-outline-secondary btn-sm">View</a>
-                                    @else
-                                        -
-                                    @endif
-                                </td>
+                        <td>
+                            @if($p->receipt_image_path)
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary btn-sm js-receipt-preview"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#receiptPreviewModal"
+                                    data-receipt-url="{{ route('payments.receipt', $p->id) }}"
+                                    data-download-url="{{ route('payments.receipt', $p->id) }}?download=1"
+                                >
+                                    View
+                                </button>
+                            @else
+                                -
+                            @endif
+                        </td>
                                 <td>{{ \Carbon\Carbon::parse($p->created_at)->format('M d, Y') }}</td>
                                 <td>
                                     @if(session('usr_role') == 'treasurer')
@@ -215,4 +224,52 @@
         </div>
     @endif
 </div>
+
+@if(in_array(session('usr_role'), ['admin', 'official', 'treasurer']))
+<div class="modal fade" id="receiptPreviewModal" tabindex="-1" aria-labelledby="receiptPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="receiptPreviewModalLabel">Receipt Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="receiptPreviewImage" src="" alt="Receipt preview" class="img-fluid rounded border" style="max-height: 70vh; object-fit: contain;">
+            </div>
+            <div class="modal-footer">
+                <a id="receiptDownloadLink" href="#" class="btn btn-secondary">Download</a>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('receiptPreviewModal');
+    const previewImage = document.getElementById('receiptPreviewImage');
+    const downloadLink = document.getElementById('receiptDownloadLink');
+    if (!modal || !previewImage || !downloadLink) {
+        return;
+    }
+
+    modal.addEventListener('show.bs.modal', function (event) {
+        const trigger = event.relatedTarget;
+        if (!trigger) {
+            return;
+        }
+
+        const receiptUrl = trigger.getAttribute('data-receipt-url');
+        const receiptDownloadUrl = trigger.getAttribute('data-download-url');
+
+        previewImage.src = receiptUrl || '';
+        downloadLink.href = receiptDownloadUrl || '#';
+    });
+
+    modal.addEventListener('hidden.bs.modal', function () {
+        previewImage.src = '';
+    });
+});
+</script>
+@endif
 @endsection
