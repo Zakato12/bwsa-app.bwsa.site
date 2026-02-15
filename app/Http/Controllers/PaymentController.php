@@ -52,6 +52,12 @@ class PaymentController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'payment_method' => 'required|in:2',
             'receipt' => 'required|file|mimes:jpeg,jpg,png|mimetypes:image/jpeg,image/png|max:2048',
+        ], [
+            'receipt.required' => 'Receipt is required.',
+            'receipt.file' => 'Receipt must be a file upload.',
+            'receipt.mimes' => 'Invalid file type. Upload JPG, JPEG, or PNG only.',
+            'receipt.mimetypes' => 'Invalid receipt file content. Upload a valid image file.',
+            'receipt.max' => 'Receipt must not exceed 2MB.',
         ]);
 
         $receipt = $request->file('receipt');

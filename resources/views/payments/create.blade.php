@@ -11,6 +11,12 @@
                     <h5>{{ $bill ? 'Pay Bill' : 'Submit Payment' }}</h5>
                 </div>
                 <div class="card-body">
+                    @if($errors->any())
+                        <div class="alert alert-danger">
+                            Please fix the highlighted field errors before submitting.
+                        </div>
+                    @endif
+
                     <form action="{{ route('payments.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
                         @if($bill)
@@ -27,7 +33,17 @@
                         </div>
                         <div class="mb-3">
                             <label for="receipt" class="form-label">Receipt</label>
-                            <input type="file" class="form-control" name="receipt" accept="image/*" required>
+                            <input
+                                type="file"
+                                class="form-control @error('receipt') is-invalid @enderror"
+                                name="receipt"
+                                accept="image/jpeg,image/png"
+                                required
+                            >
+                            <small class="text-muted d-block mt-1">Accepted files: JPG, JPEG, PNG (max 2MB).</small>
+                            @error('receipt')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                         </div>
                         <button type="submit" class="btn btn-primary">{{ $bill ? 'Pay Bill' : 'Submit Payment' }}</button>
                         <a href="{{ route('payments.index') }}" class="btn btn-secondary">Cancel</a>
