@@ -22,9 +22,9 @@
                         <tr>
                             <th>ID</th>
                             <th>User</th>
-                            <th><a href="?sort_by=amount&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '&uarr;' : '&darr;') : '' }}</a></th>
+                            <th><a href="?sort_by=amount&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Status</th>
-                            <th><a href="?sort_by=created_at&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '&uarr;' : '&darr;') : '' }}</a></th>
+                            <th><a href="?sort_by=created_at&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -54,14 +54,14 @@
                         <tr>
                             <th>ID</th>
                             <th>User</th>
-                            <th><a href="?sort_by=amount&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '&uarr;' : '&darr;') : '' }}</a></th>
+                            <th><a href="?sort_by=amount&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Method</th>
-                            <th><a href="?sort_by=status&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '&uarr;' : '&darr;') : '' }}</a></th>
+                            <th><a href="?sort_by=status&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>OCR Amount</th>
                             <th>Reference</th>
                             <th>OCR Status</th>
                             <th>Receipt</th>
-                            <th><a href="?sort_by=created_at&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '&uarr;' : '&darr;') : '' }}</a></th>
+                            <th><a href="?sort_by=created_at&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Actions</th>
                         </tr>
                     </thead>
