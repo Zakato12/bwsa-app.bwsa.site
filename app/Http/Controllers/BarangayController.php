@@ -14,15 +14,31 @@ class BarangayController extends Controller
             return $redirect;
         }
 
-        $barangays = DB::table('barangays')
+        $search = trim((string) request('q', ''));
+
+        $query = DB::table('barangays')
             ->select('barangays.*')
             ->selectSub(function ($query) {
                 $query->from('residents')
                     ->selectRaw('COUNT(*)')
                     ->whereColumn('residents.barangay_id', 'barangays.id');
-            }, 'resident_count')
-            ->get();
-        return view('pages.barangays.index', compact('barangays'));
+            }, 'resident_count');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('barangays.name', 'like', '%' . $search . '%')
+                    ->orWhere('barangays.brgy_code', 'like', '%' . $search . '%')
+                    ->orWhere('barangays.address', 'like', '%' . $search . '%')
+                    ->orWhereRaw('CAST(barangays.payment_amount_per_bill AS CHAR) LIKE ?', ['%' . $search . '%']);
+            });
+        }
+
+        $barangays = $query
+            ->orderBy('barangays.created_at', 'desc')
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('pages.barangays.index', compact('barangays', 'search'));
     }
 
     public function create()

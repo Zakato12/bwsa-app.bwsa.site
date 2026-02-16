@@ -6,6 +6,18 @@
     <div>
         <h1>User List</h1>
 
+        <form method="GET" action="{{ route('users.list') }}" class="row g-2 mb-3">
+            <div class="col-sm-8 col-md-5">
+                <input type="text" name="q" class="form-control" placeholder="Search users" value="{{ $search ?? '' }}">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-outline-primary">Search</button>
+            </div>
+            <div class="col-auto">
+                <a href="{{ route('users.list') }}" class="btn btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+
         <table class="table table-striped">
             <thead>
                 <tr>
@@ -53,6 +65,10 @@
                 @endforeach
             </tbody>
         </table>
+
+        <div class="mt-2">
+            {{ $users->links() }}
+        </div>
     </div>
 
     <!-- Edit User Modal -->

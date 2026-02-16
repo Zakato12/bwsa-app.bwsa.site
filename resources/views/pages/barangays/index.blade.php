@@ -8,6 +8,18 @@
 
         <a href="{{ route('barangays.create') }}" class="btn btn-primary mb-3">Add Barangay</a>
 
+        <form method="GET" action="{{ route('barangays.index') }}" class="row g-2 mb-3">
+            <div class="col-sm-8 col-md-5">
+                <input type="text" name="q" class="form-control" placeholder="Search barangays" value="{{ $search ?? '' }}">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-outline-primary">Search</button>
+            </div>
+            <div class="col-auto">
+                <a href="{{ route('barangays.index') }}" class="btn btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+
         <table class="table table-striped">
             <thead>
                 <tr>
@@ -47,5 +59,9 @@
                 @endforeach
             </tbody>
         </table>
+
+        <div class="mt-2">
+            {{ $barangays->links() }}
+        </div>
     </div>
 @endsection

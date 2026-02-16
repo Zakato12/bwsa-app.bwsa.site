@@ -144,6 +144,7 @@ class PaymentController extends Controller
             return $redirect;
         }
 
+        $search = trim((string) request('q', ''));
         $sortBy = request('sort_by', 'created_at');
         $sortOrder = request('sort_order', 'desc');
 
@@ -154,11 +155,20 @@ class PaymentController extends Controller
         $sortOrder = $sortOrder === 'asc' ? 'asc' : 'desc';
 
         if (in_array(session('usr_role'), ['admin', 'official', 'treasurer'])) {
-            // Show separate bills and payments
             $baseQuery = DB::table('payments')
                 ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
                 ->leftJoin('users', 'payments.user_id', '=', 'users.id')
-                ->select('payments.*', 'gcash_payments.ocr_text', 'gcash_payments.extracted_amount', 'gcash_payments.extracted_reference', 'gcash_payments.confidence_score', 'gcash_payments.receipt_image_path', 'gcash_payments.verified_at', 'users.username as user_name');
+                ->select(
+                    'payments.*',
+                    'gcash_payments.ocr_text',
+                    'gcash_payments.extracted_amount',
+                    'gcash_payments.extracted_reference',
+                    'gcash_payments.confidence_score',
+                    'gcash_payments.receipt_image_path',
+                    'gcash_payments.verified_at',
+                    'users.username as user_name',
+                    'users.full_name as full_name'
+                );
 
             if (in_array(session('usr_role'), ['official', 'treasurer'], true)) {
                 $barangayId = $this->currentUserBarangayId();
@@ -169,34 +179,65 @@ class PaymentController extends Controller
                     ->where('residents.barangay_id', $barangayId);
             }
 
-            $bills = (clone $baseQuery)
-                ->where('payments.status', 0)
-                ->where('payments.payment_method', 0)
-                ->orderBy($sortBy, $sortOrder)
-                ->get();
+            if ($search !== '') {
+                $baseQuery->where(function ($q) use ($search) {
+                    $q->where('users.username', 'like', '%' . $search . '%')
+                        ->orWhere('users.full_name', 'like', '%' . $search . '%')
+                        ->orWhereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+                });
+            }
 
-            $payments = (clone $baseQuery)
-                ->where('payments.status', '>', 0)
+            $unpaidRecords = (clone $baseQuery)
+                ->whereIn('payments.status', [0, 1, 2])
                 ->orderBy($sortBy, $sortOrder)
-                ->get();
+                ->paginate(10, ['*'], 'unpaid_page')
+                ->withQueryString();
 
-            return view('payments.index', compact('bills', 'payments', 'sortBy', 'sortOrder'));
+            $paidRecords = (clone $baseQuery)
+                ->where('payments.status', 3)
+                ->orderBy($sortBy, $sortOrder)
+                ->paginate(10, ['*'], 'paid_page')
+                ->withQueryString();
+
+            return view('payments.index', compact('unpaidRecords', 'paidRecords', 'sortBy', 'sortOrder', 'search'));
         } else {
-            // For residents: separate bills and payment history
-            $bills = DB::table('payments')
+            $billsQuery = DB::table('payments')
                 ->where('user_id', session('usr_id'))
-                ->where('status', 0)
-                ->orderBy($sortBy, $sortOrder)
-                ->get();
+                ->where('status', 0);
 
-            $payments = DB::table('payments')
+            if ($search !== '') {
+                $billsQuery->where(function ($q) use ($search) {
+                    $q->whereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+                });
+            }
+
+            $bills = $billsQuery
+                ->orderBy($sortBy, $sortOrder)
+                ->paginate(10, ['*'], 'my_bills_page')
+                ->withQueryString();
+
+            $paymentsQuery = DB::table('payments')
                 ->where('user_id', session('usr_id'))
                 ->where('status', '>', 0)
                 ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
                 ->select('payments.*', 'gcash_payments.ocr_text', 'gcash_payments.extracted_amount', 'gcash_payments.extracted_reference', 'gcash_payments.confidence_score', 'gcash_payments.receipt_image_path', 'gcash_payments.verified_at')
+                ;
+
+            if ($search !== '') {
+                $paymentsQuery->where(function ($q) use ($search) {
+                    $q->whereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+                });
+            }
+
+            $payments = $paymentsQuery
                 ->orderBy($sortBy, $sortOrder)
-                ->get();
-            return view('payments.index', compact('bills', 'payments', 'sortBy', 'sortOrder'));
+                ->paginate(10, ['*'], 'my_payments_page')
+                ->withQueryString();
+
+            return view('payments.index', compact('bills', 'payments', 'sortBy', 'sortOrder', 'search'));
         }
     }
 

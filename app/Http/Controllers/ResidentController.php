@@ -13,12 +13,23 @@ class ResidentController extends Controller
             return $redirect;
         }
 
+        $search = trim((string) request('q', ''));
+
         $query = DB::table('residents')
             ->join('users', 'residents.user_id', '=', 'users.id')
             ->join('barangays', 'residents.barangay_id', '=', 'barangays.id')
             ->select('residents.id', 'users.full_name', 'users.username', 'barangays.name as barangay', 'residents.created_at')
             ->where('users.status', 'active')
             ->orderBy('residents.created_at', 'desc');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('users.full_name', 'like', '%' . $search . '%')
+                    ->orWhere('users.username', 'like', '%' . $search . '%')
+                    ->orWhere('barangays.name', 'like', '%' . $search . '%')
+                    ->orWhereRaw('CAST(residents.id AS CHAR) LIKE ?', ['%' . $search . '%']);
+            });
+        }
 
         if (session('usr_role') === 'official') {
             $barangayId = $this->currentUserBarangayId();
@@ -28,9 +39,9 @@ class ResidentController extends Controller
             $query->where('residents.barangay_id', $barangayId);
         }
 
-        $residents = $query->get();
+        $residents = $query->paginate(10)->withQueryString();
 
-        return view('pages.residents.index', compact('residents'));
+        return view('pages.residents.index', compact('residents', 'search'));
     }
 
     public function create()

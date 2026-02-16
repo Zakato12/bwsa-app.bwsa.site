@@ -13,17 +13,33 @@ class UserController extends Controller
             return $redirect;
         }
 
-        $users = DB::table('users')
+        $search = trim((string) request('q', ''));
+
+        $query = DB::table('users')
             ->join('roles', 'users.role_id', '=', 'roles.id')
-            ->join('barangays', 'users.barangay_id', '=', 'barangays.id')
+            ->leftJoin('barangays', 'users.barangay_id', '=', 'barangays.id')
             ->select('users.id', 'users.username', 'users.full_name', 'roles.name as role', 'barangays.name as barangay_name', 'users.status', 'users.created_at', 'users.barangay_id', 'users.role_id')
             ->where('users.id', '!=', '4')
-            ->where('users.id', '!=', '1')
-            ->get();
+            ->where('users.id', '!=', '1');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('users.username', 'like', '%' . $search . '%')
+                    ->orWhere('users.full_name', 'like', '%' . $search . '%')
+                    ->orWhere('roles.name', 'like', '%' . $search . '%')
+                    ->orWhere('users.status', 'like', '%' . $search . '%')
+                    ->orWhere('barangays.name', 'like', '%' . $search . '%');
+            });
+        }
+
+        $users = $query
+            ->orderBy('users.created_at', 'desc')
+            ->paginate(10)
+            ->withQueryString();
 
         $barangays = DB::table('barangays')->select('id', 'name')->orderBy('name')->get();
 
-        return view('pages.users.list', compact('users', 'barangays'));
+        return view('pages.users.list', compact('users', 'barangays', 'search'));
     }
 
     public function updateUser(Request $request, $id)

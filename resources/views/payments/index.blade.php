@@ -13,12 +13,19 @@
         @endif
     </div>
 
-    @if(in_array(session('usr_role'), ['admin', 'official', 'treasurer']))
-        @php
-            $unpaidList = $bills->concat($payments->whereIn('status', [1, 2]))->sortByDesc('created_at')->values();
-            $paidList = $payments->where('status', 3)->sortByDesc('created_at')->values();
-        @endphp
+    <form method="GET" action="{{ route('payments.index') }}" class="row g-2 mb-3">
+        <div class="col-sm-8 col-md-5">
+            <input type="text" name="q" class="form-control" placeholder="Search by ID, user, or amount" value="{{ $search ?? '' }}">
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-outline-primary">Search</button>
+        </div>
+        <div class="col-auto">
+            <a href="{{ route('payments.index') }}" class="btn btn-outline-secondary">Reset</a>
+        </div>
+    </form>
 
+    @if(in_array(session('usr_role'), ['admin', 'official', 'treasurer']))
         <div class="mb-4">
             <h3>Unpaid List</h3>
             <div class="table-responsive">
@@ -27,16 +34,16 @@
                         <tr>
                             <th>ID</th>
                             <th>User</th>
-                            <th><a href="?sort_by=amount&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
+                            <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'amount', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Method</th>
-                            <th><a href="?sort_by=status&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
+                            <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'status', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Receipt</th>
-                            <th><a href="?sort_by=created_at&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
+                            <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($unpaidList as $p)
+                        @forelse($unpaidRecords as $p)
                             <tr>
                                 <td>{{ $p->id }}</td>
                                 <td>{{ $p->user_name }}</td>
@@ -97,6 +104,9 @@
                     </tbody>
                 </table>
             </div>
+            <div class="mt-2">
+                {{ $unpaidRecords->links() }}
+            </div>
         </div>
 
         <div class="mb-4">
@@ -107,15 +117,15 @@
                         <tr>
                             <th>ID</th>
                             <th>User</th>
-                            <th><a href="?sort_by=amount&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
+                            <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'amount', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Method</th>
                             <th>Status</th>
                             <th>Receipt</th>
-                            <th><a href="?sort_by=created_at&sort_order={{ $sortOrder == 'asc' ? 'desc' : 'asc' }}" class="text-decoration-none text-dark">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
+                            <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($paidList as $p)
+                        @forelse($paidRecords as $p)
                             <tr>
                                 <td>{{ $p->id }}</td>
                                 <td>{{ $p->user_name }}</td>
@@ -147,6 +157,9 @@
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+            <div class="mt-2">
+                {{ $paidRecords->links() }}
             </div>
         </div>
     @else
@@ -181,6 +194,9 @@
                             @endforelse
                         </tbody>
                     </table>
+                </div>
+                <div class="mt-2">
+                    {{ $bills->links() }}
                 </div>
             </div>
             <div class="col-md-6">
@@ -222,6 +238,9 @@
                             @endforelse
                         </tbody>
                     </table>
+                </div>
+                <div class="mt-2">
+                    {{ $payments->links() }}
                 </div>
             </div>
         </div>
