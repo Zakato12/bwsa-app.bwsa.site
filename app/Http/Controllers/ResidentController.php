@@ -84,11 +84,18 @@ class ResidentController extends Controller
                 'Purok 9',
                 'Purok 10',
             ])],
-            'contact_number' => 'nullable|string|max:20|regex:/^[0-9+\\-\\s()]{7,20}$/',
+            'contact_number' => [
+                'nullable',
+                'string',
+                'max:20',
+                'regex:/^[0-9+\\-\\s()]{7,20}$/',
+                Rule::unique('residents', 'contact_number'),
+            ],
         ], [
             'full_name.unique' => 'This resident full name already exists.',
             'address.in' => 'Please select a valid Purok.',
             'contact_number.regex' => 'Contact number format is invalid.',
+            'contact_number.unique' => 'This contact number is already in use.',
         ]);
 
         $barangayId = $this->currentUserBarangayId();
@@ -181,12 +188,19 @@ class ResidentController extends Controller
                 'Purok 9',
                 'Purok 10',
             ])],
-            'contact_number' => 'nullable|string|max:20|regex:/^[0-9+\\-\\s()]{7,20}$/',
+            'contact_number' => [
+                'nullable',
+                'string',
+                'max:20',
+                'regex:/^[0-9+\\-\\s()]{7,20}$/',
+                Rule::unique('residents', 'contact_number')->ignore($id, 'id'),
+            ],
             'barangay_id' => 'required|exists:barangays,id',
         ], [
             'full_name.unique' => 'This resident full name already exists.',
             'address.in' => 'Please select a valid Purok.',
             'contact_number.regex' => 'Contact number format is invalid.',
+            'contact_number.unique' => 'This contact number is already in use.',
         ]);
 
         $resident = DB::table('residents')->where('id', $id)->first();
