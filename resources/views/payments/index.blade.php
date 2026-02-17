@@ -46,7 +46,7 @@
                         @forelse($unpaidRecords as $p)
                             <tr>
                                 <td>{{ $p->id }}</td>
-                                <td>{{ $p->user_name }}</td>
+                                <td>{{ $p->full_name ?? $p->user_name }}</td>
                                 <td>{{ number_format($p->amount, 2) }}</td>
                                 <td>{{ $p->payment_method == 0 ? 'Bill' : ($p->payment_method == 1 ? 'Cash' : 'GCash') }}</td>
                                 <td>
@@ -128,7 +128,7 @@
                         @forelse($paidRecords as $p)
                             <tr>
                                 <td>{{ $p->id }}</td>
-                                <td>{{ $p->user_name }}</td>
+                                <td>{{ $p->full_name ?? $p->user_name }}</td>
                                 <td>{{ number_format($p->amount, 2) }}</td>
                                 <td>{{ $p->payment_method == 1 ? 'Cash' : 'GCash' }}</td>
                                 <td><span class="badge bg-success">Approved</span></td>

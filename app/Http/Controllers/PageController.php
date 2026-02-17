@@ -103,7 +103,7 @@ class PageController extends Controller
                             ->join('users', 'payments.user_id', '=', 'users.id')
                             ->join('residents', 'residents.user_id', '=', 'payments.user_id')
                             ->where('residents.barangay_id', $barangayId)
-                            ->select('payments.id', 'users.username', 'payments.amount', 'payments.payment_method', 'payments.status', 'payments.created_at')
+                            ->select('payments.id', 'users.username', 'users.full_name', 'payments.amount', 'payments.payment_method', 'payments.status', 'payments.created_at')
                             ->orderBy('payments.created_at', 'desc')
                             ->limit(5)
                             ->get()

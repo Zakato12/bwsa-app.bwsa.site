@@ -75,7 +75,7 @@
                         @forelse($recentPayments as $payment)
                             <tr>
                                 <td>#{{ $payment->id }}</td>
-                                <td>{{ $payment->username }}</td>
+                                <td>{{ $payment->full_name ?? $payment->username }}</td>
                                 <td>{{ number_format($payment->amount, 2) }}</td>
                                 <td>
                                     @if($payment->payment_method == 0) Bill
