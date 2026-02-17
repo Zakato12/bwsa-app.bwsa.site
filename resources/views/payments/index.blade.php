@@ -54,7 +54,7 @@
                                     @if($p->status == -1)
                                         <span class="badge bg-danger">Overdue Bill</span>
                                     @elseif($p->status == 0)
-                                        <span class="badge bg-secondary">Bill Generated</span>
+                                        <span class="badge bg-secondary">Unpaid</span>
                                     @elseif($p->status == 1)
                                         <span class="badge bg-warning">Pending</span>
                                     @elseif($p->status == 2)
