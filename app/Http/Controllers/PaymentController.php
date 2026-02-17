@@ -33,10 +33,10 @@ class PaymentController extends Controller
 
         $bill = null;
         if (request('bill_id')) {
-            $bill = DB::table('payments')
+            $bill = DB::table('bills')
                 ->where('id', request('bill_id'))
                 ->where('user_id', session('usr_id'))
-                ->where('status', 0)
+                ->whereIn('status', ['pending', 'overdue'])
                 ->first();
         }
         return view('payments.create', compact('bill'));
@@ -71,22 +71,30 @@ class PaymentController extends Controller
 
         if ($request->bill_id) {
             // Paying an existing bill
-            $bill = DB::table('payments')
+            $bill = DB::table('bills')
                 ->where('id', $request->bill_id)
                 ->where('user_id', $userId)
-                ->where('status', 0)
+                ->whereIn('status', ['pending', 'overdue'])
                 ->first();
 
             if (!$bill) {
                 return redirect()->back()->with('error', 'Invalid bill selected.');
             }
 
-            DB::table('payments')->where('id', $request->bill_id)->update([
+            $paymentId = DB::table('payments')->insertGetId([
+                'user_id' => $userId,
+                'amount' => $bill->amount,
                 'payment_method' => $request->payment_method,
                 'status' => 1,
+                'created_at' => now(),
                 'updated_at' => now(),
             ]);
-            $paymentId = $request->bill_id;
+
+            DB::table('bills')->where('id', $request->bill_id)->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+                'updated_at' => now(),
+            ]);
         } else {
             // New payment submission
             $paymentId = DB::table('payments')->insertGetId([
@@ -189,7 +197,7 @@ class PaymentController extends Controller
             }
 
             $unpaidRecords = (clone $baseQuery)
-                ->whereIn('payments.status', [0, 1, 2])
+                ->whereIn('payments.status', [1, 2])
                 ->orderBy($sortBy, $sortOrder)
                 ->paginate(10, ['*'], 'unpaid_page')
                 ->withQueryString();
@@ -202,14 +210,15 @@ class PaymentController extends Controller
 
             return view('payments.index', compact('unpaidRecords', 'paidRecords', 'sortBy', 'sortOrder', 'search'));
         } else {
-            $billsQuery = DB::table('payments')
+            $billsQuery = DB::table('bills')
                 ->where('user_id', session('usr_id'))
-                ->where('status', 0);
+                ->whereIn('status', ['pending', 'overdue']);
 
             if ($search !== '') {
                 $billsQuery->where(function ($q) use ($search) {
-                    $q->whereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
-                        ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+                    $q->whereRaw('CAST(bills.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('CAST(bills.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhere('bills.bill_name', 'like', '%' . $search . '%');
                 });
             }
 
@@ -399,7 +408,9 @@ class PaymentController extends Controller
         }
 
         $validated = $request->validate([
+            'bill_name' => 'required|string|max:150',
             'amount' => 'required|numeric|min:0.01',
+            'due_date' => 'required|date',
         ]);
 
         $residentUserIds = DB::table('residents')
@@ -412,9 +423,9 @@ class PaymentController extends Controller
             return redirect()->back()->with('error', 'No residents found in your barangay.');
         }
 
-        $existingUnpaid = DB::table('payments')
+        $existingUnpaid = DB::table('bills')
             ->whereIn('user_id', $residentUserIds)
-            ->where('status', 0)
+            ->whereIn('status', ['pending', 'overdue'])
             ->pluck('user_id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -425,16 +436,20 @@ class PaymentController extends Controller
         foreach ($billableUserIds as $userId) {
             $rows[] = [
                 'user_id' => $userId,
+                'bill_name' => $validated['bill_name'],
                 'amount' => $validated['amount'],
-                'payment_method' => 0, // 0 for bill
-                'status' => 0, // 0 for bill generated
+                'due_date' => $validated['due_date'],
+                'status' => 'pending',
+                'paid_at' => null,
+                'is_recurring' => 0,
+                'recurrence_type' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
         }
 
         if (!empty($rows)) {
-            DB::table('payments')->insert($rows);
+            DB::table('bills')->insert($rows);
         }
 
         Log::info('payments.bill_batch_created', [
@@ -452,7 +467,7 @@ class PaymentController extends Controller
 
         return redirect()->route('payments.index')->with(
             'success',
-            'Bills generated: ' . count($rows) . '. Skipped (already unpaid): ' . count($existingUnpaid) . '.'
+            'Bills generated: ' . count($rows) . '. Skipped (already has pending/overdue bill): ' . count($existingUnpaid) . '.'
         );
     }
 

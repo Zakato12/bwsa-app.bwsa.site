@@ -172,8 +172,10 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
+                                <th>Bill</th>
                                 <th>Amount</th>
-                                <th>Date</th>
+                                <th>Due Date</th>
+                                <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -181,15 +183,23 @@
                             @forelse($bills as $bill)
                             <tr>
                                 <td>{{ $bill->id }}</td>
+                                <td>{{ $bill->bill_name }}</td>
                                 <td>{{ number_format($bill->amount, 2) }}</td>
-                                <td>{{ \Carbon\Carbon::parse($bill->created_at)->format('M d, Y') }}</td>
+                                <td>{{ \Carbon\Carbon::parse($bill->due_date)->format('M d, Y') }}</td>
+                                <td>
+                                    @if($bill->status === 'overdue')
+                                        <span class="badge bg-danger">Overdue</span>
+                                    @else
+                                        <span class="badge bg-secondary">Pending</span>
+                                    @endif
+                                </td>
                                 <td>
                                     <a href="{{ route('payments.create') }}?bill_id={{ $bill->id }}" class="btn btn-primary btn-sm">Pay Bill</a>
                                 </td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="4" class="text-center">No bills found.</td>
+                                <td colspan="6" class="text-center">No bills found.</td>
                             </tr>
                             @endforelse
                         </tbody>

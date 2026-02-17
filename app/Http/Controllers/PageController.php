@@ -92,10 +92,10 @@ class PageController extends Controller
                             ->count()
                         : 0;
                     $pendingBills = $barangayId
-                        ? DB::table('payments')
-                            ->join('residents', 'residents.user_id', '=', 'payments.user_id')
+                        ? DB::table('bills')
+                            ->join('residents', 'residents.user_id', '=', 'bills.user_id')
                             ->where('residents.barangay_id', $barangayId)
-                            ->where('payments.status', 0)
+                            ->whereIn('bills.status', ['pending', 'overdue'])
                             ->count()
                         : 0;
                     $recentPayments = $barangayId
@@ -116,9 +116,9 @@ class PageController extends Controller
                     ));
                 case 'resident':
                     $userId = session('usr_id');
-                    $unpaidBills = DB::table('payments')
+                    $unpaidBills = DB::table('bills')
                         ->where('user_id', $userId)
-                        ->where('status', 0)
+                        ->whereIn('status', ['pending', 'overdue'])
                         ->count();
                     $recentPayments = DB::table('payments')
                         ->where('user_id', $userId)

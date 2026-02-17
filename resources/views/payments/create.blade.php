@@ -21,6 +21,14 @@
                         @csrf
                         @if($bill)
                             <input type="hidden" name="bill_id" value="{{ $bill->id }}">
+                            <div class="mb-3">
+                                <label class="form-label">Bill Name</label>
+                                <input type="text" class="form-control" value="{{ $bill->bill_name }}" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Due Date</label>
+                                <input type="text" class="form-control" value="{{ \Carbon\Carbon::parse($bill->due_date)->format('M d, Y') }}" readonly>
+                            </div>
                         @endif
                         <div class="mb-3">
                             <label for="amount" class="form-label">Amount</label>

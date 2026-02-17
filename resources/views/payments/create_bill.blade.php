@@ -22,6 +22,19 @@
                             <input type="text" class="form-control" value="{{ $residentCount }}" readonly>
                         </div>
                         <div class="mb-3">
+                            <label for="bill_name" class="form-label">Bill Name</label>
+                            <input
+                                type="text"
+                                name="bill_name"
+                                id="bill_name"
+                                class="form-control"
+                                maxlength="150"
+                                value="{{ old('bill_name') }}"
+                                placeholder="e.g. Monthly Water Bill"
+                                required
+                            >
+                        </div>
+                        <div class="mb-3">
                             <label for="amount" class="form-label">Amount</label>
                             <input
                                 type="number"
@@ -30,7 +43,18 @@
                                 class="form-control"
                                 step="0.01"
                                 min="0.01"
-                                value="{{ $barangay->payment_amount_per_bill ?? '' }}"
+                                value="{{ old('amount', $barangay->payment_amount_per_bill ?? '') }}"
+                                required
+                            >
+                        </div>
+                        <div class="mb-3">
+                            <label for="due_date" class="form-label">Due Date</label>
+                            <input
+                                type="date"
+                                name="due_date"
+                                id="due_date"
+                                class="form-control"
+                                value="{{ old('due_date') }}"
                                 required
                             >
                         </div>

@@ -40,9 +40,25 @@ class AuthController extends Controller
             $request->session()->regenerateToken();
 
             $role = DB::table('roles')->where('id', $users->role_id)->value('name');
+            $barangayName = null;
+
+            if (!empty($users->barangay_id)) {
+                $barangayName = DB::table('barangays')
+                    ->where('id', $users->barangay_id)
+                    ->value('name');
+            }
+
+            if (!$barangayName) {
+                $barangayName = DB::table('residents')
+                    ->join('barangays', 'residents.barangay_id', '=', 'barangays.id')
+                    ->where('residents.user_id', $users->id)
+                    ->value('barangays.name');
+            }
+
             session()->put('usr_id', $users->id);
             session()->put('usr_name', $users->username);
             session()->put('usr_role', $role);
+            session()->put('usr_barangay', $barangayName);
             session()->put('last_activity', time());
             session()->put('auth_ip', $request->ip());
             session()->put('auth_ua_hash', hash('sha256', (string) $request->userAgent()));
