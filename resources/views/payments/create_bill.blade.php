@@ -60,10 +60,7 @@
                         </div>
                         <div class="mb-3">
                             <label for="recurrence_type" class="form-label">Recurrence</label>
-                            <select name="recurrence_type" id="recurrence_type" class="form-control" required>
-                                <option value="monthly" {{ old('recurrence_type') === 'monthly' ? 'selected' : '' }}>Monthly</option>
-                                <option value="bimonthly" {{ old('recurrence_type') === 'bimonthly' ? 'selected' : '' }}>Bimonthly</option>
-                            </select>
+                            <input type="text" class="form-control" value="Monthly" readonly>
                         </div>
                         <button type="submit" class="btn btn-primary">Generate Bills for All Residents</button>
                         <a href="{{ route('payments.index') }}" class="btn btn-secondary">Cancel</a>

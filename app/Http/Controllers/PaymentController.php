@@ -122,10 +122,8 @@ class PaymentController extends Controller
                 'updated_at' => now(),
             ]);
 
-            if ((int) $bill->is_recurring === 1 && in_array($bill->recurrence_type, ['monthly', 'bimonthly'], true)) {
-                $nextDueDate = $bill->recurrence_type === 'bimonthly'
-                    ? Carbon::parse($bill->due_date)->addMonthsNoOverflow(2)->toDateString()
-                    : Carbon::parse($bill->due_date)->addMonthNoOverflow()->toDateString();
+            if ((int) $bill->is_recurring === 1 && $bill->recurrence_type === 'monthly') {
+                $nextDueDate = Carbon::parse($bill->due_date)->addMonthNoOverflow()->toDateString();
 
                 $existingNextBill = DB::table('bills')
                     ->where('user_id', $userId)
@@ -479,7 +477,6 @@ class PaymentController extends Controller
             'bill_name' => 'required|string|max:150',
             'amount' => 'required|numeric|min:0.01',
             'due_date' => 'required|date',
-            'recurrence_type' => 'required|in:monthly,bimonthly',
         ]);
 
         $residentUserIds = DB::table('residents')
@@ -511,7 +508,7 @@ class PaymentController extends Controller
                 'status' => 'pending',
                 'paid_at' => null,
                 'is_recurring' => 1,
-                'recurrence_type' => $validated['recurrence_type'],
+                'recurrence_type' => 'monthly',
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
