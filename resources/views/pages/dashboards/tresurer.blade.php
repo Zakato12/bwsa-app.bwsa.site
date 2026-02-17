@@ -6,7 +6,12 @@
 <div class="dashboard-wrapper">
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="page-title">Treasurer Dashboard</h2>
+            <div>
+                <h2 class="page-title mb-1">Treasurer Dashboard</h2>
+                @if(session('usr_barangay'))
+                    <div class="fw-semibold text-primary">Barangay: {{ session('usr_barangay') }}</div>
+                @endif
+            </div>
             <span class="text-muted">Welcome back, {{ session('usr_name') }}</span>
         </div>
 

@@ -208,14 +208,113 @@ class PaymentController extends Controller
         $sortBy = request('sort_by', 'created_at');
         $sortOrder = request('sort_order', 'desc');
 
-        $allowedSort = ['created_at', 'amount', 'status'];
+        $allowedSort = ['created_at', 'amount', 'status', 'due_date'];
         if (!in_array($sortBy, $allowedSort, true)) {
             $sortBy = 'created_at';
         }
         $sortOrder = $sortOrder === 'asc' ? 'asc' : 'desc';
 
         if (in_array(session('usr_role'), ['admin', 'official', 'treasurer'])) {
-            $baseQuery = DB::table('payments')
+            DB::table('bills')
+                ->where('status', 'pending')
+                ->whereDate('due_date', '<', now()->toDateString())
+                ->update([
+                    'status' => 'overdue',
+                    'updated_at' => now(),
+                ]);
+
+            $isScopedToBarangay = in_array(session('usr_role'), ['official', 'treasurer'], true);
+            $barangayId = null;
+            if ($isScopedToBarangay) {
+                $barangayId = $this->currentUserBarangayId();
+                if (!$barangayId) {
+                    return redirect()->route('dashboard')->with('error', 'Barangay assignment required.');
+                }
+            }
+
+            $unpaidBillsQuery = DB::table('bills')
+                ->join('users', 'bills.user_id', '=', 'users.id')
+                ->select(
+                    'bills.id',
+                    'bills.user_id',
+                    'bills.amount',
+                    DB::raw('0 as payment_method'),
+                    DB::raw("CASE WHEN bills.status = 'overdue' THEN -1 ELSE 0 END as status"),
+                    'bills.due_date',
+                    'bills.created_at',
+                    'bills.updated_at',
+                    DB::raw('NULL as ocr_text'),
+                    DB::raw('NULL as extracted_amount'),
+                    DB::raw('NULL as extracted_reference'),
+                    DB::raw('NULL as confidence_score'),
+                    DB::raw('NULL as receipt_image_path'),
+                    DB::raw('NULL as verified_at'),
+                    'users.username as user_name',
+                    'users.full_name as full_name',
+                    DB::raw("'bill' as row_type")
+                )
+                ->whereIn('bills.status', ['pending', 'overdue']);
+
+            if ($isScopedToBarangay) {
+                $unpaidBillsQuery->join('residents', 'residents.user_id', '=', 'bills.user_id')
+                    ->where('residents.barangay_id', $barangayId);
+            }
+
+            if ($search !== '') {
+                $unpaidBillsQuery->where(function ($q) use ($search) {
+                    $q->where('users.username', 'like', '%' . $search . '%')
+                        ->orWhere('users.full_name', 'like', '%' . $search . '%')
+                        ->orWhereRaw('CAST(bills.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('CAST(bills.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhere('bills.bill_name', 'like', '%' . $search . '%');
+                });
+            }
+
+            $unpaidPaymentsQuery = DB::table('payments')
+                ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
+                ->leftJoin('users', 'payments.user_id', '=', 'users.id')
+                ->select(
+                    'payments.id',
+                    'payments.user_id',
+                    'payments.amount',
+                    'payments.payment_method',
+                    'payments.status',
+                    DB::raw('NULL as due_date'),
+                    'payments.created_at',
+                    'payments.updated_at',
+                    'gcash_payments.ocr_text',
+                    'gcash_payments.extracted_amount',
+                    'gcash_payments.extracted_reference',
+                    'gcash_payments.confidence_score',
+                    'gcash_payments.receipt_image_path',
+                    'gcash_payments.verified_at',
+                    'users.username as user_name',
+                    'users.full_name as full_name',
+                    DB::raw("'payment' as row_type")
+                )
+                ->whereIn('payments.status', [1, 2]);
+
+            if ($isScopedToBarangay) {
+                $unpaidPaymentsQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
+                    ->where('residents.barangay_id', $barangayId);
+            }
+
+            if ($search !== '') {
+                $unpaidPaymentsQuery->where(function ($q) use ($search) {
+                    $q->where('users.username', 'like', '%' . $search . '%')
+                        ->orWhere('users.full_name', 'like', '%' . $search . '%')
+                        ->orWhereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+                });
+            }
+
+            $unpaidRecords = DB::query()
+                ->fromSub($unpaidBillsQuery->unionAll($unpaidPaymentsQuery), 'unpaid_rows')
+                ->orderBy($sortBy, $sortOrder)
+                ->paginate(10, ['*'], 'unpaid_page')
+                ->withQueryString();
+
+            $paidBaseQuery = DB::table('payments')
                 ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
                 ->leftJoin('users', 'payments.user_id', '=', 'users.id')
                 ->select(
@@ -228,19 +327,16 @@ class PaymentController extends Controller
                     'gcash_payments.verified_at',
                     'users.username as user_name',
                     'users.full_name as full_name'
-                );
+                )
+                ->where('payments.status', 3);
 
-            if (in_array(session('usr_role'), ['official', 'treasurer'], true)) {
-                $barangayId = $this->currentUserBarangayId();
-                if (!$barangayId) {
-                    return redirect()->route('dashboard')->with('error', 'Barangay assignment required.');
-                }
-                $baseQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
+            if ($isScopedToBarangay) {
+                $paidBaseQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
                     ->where('residents.barangay_id', $barangayId);
             }
 
             if ($search !== '') {
-                $baseQuery->where(function ($q) use ($search) {
+                $paidBaseQuery->where(function ($q) use ($search) {
                     $q->where('users.username', 'like', '%' . $search . '%')
                         ->orWhere('users.full_name', 'like', '%' . $search . '%')
                         ->orWhereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
@@ -248,15 +344,8 @@ class PaymentController extends Controller
                 });
             }
 
-            $unpaidRecords = (clone $baseQuery)
-                ->whereIn('payments.status', [1, 2])
-                ->orderBy($sortBy, $sortOrder)
-                ->paginate(10, ['*'], 'unpaid_page')
-                ->withQueryString();
-
-            $paidRecords = (clone $baseQuery)
-                ->where('payments.status', 3)
-                ->orderBy($sortBy, $sortOrder)
+            $paidRecords = $paidBaseQuery
+                ->orderBy($sortBy === 'due_date' ? 'created_at' : $sortBy, $sortOrder)
                 ->paginate(10, ['*'], 'paid_page')
                 ->withQueryString();
 
@@ -414,10 +503,36 @@ class PaymentController extends Controller
         $residents = DB::table('residents')
             ->join('users', 'residents.user_id', '=', 'users.id')
             ->where('residents.barangay_id', $barangayId)
-            ->select('users.id', 'users.full_name', 'users.username')
+            ->select(
+                'users.id',
+                'users.full_name',
+                'users.username',
+                DB::raw("(SELECT b1.id FROM bills b1 WHERE b1.user_id = users.id AND b1.status IN ('pending', 'overdue') ORDER BY b1.due_date ASC, b1.id ASC LIMIT 1) as unpaid_bill_id"),
+                DB::raw("(SELECT b2.amount FROM bills b2 WHERE b2.user_id = users.id AND b2.status IN ('pending', 'overdue') ORDER BY b2.due_date ASC, b2.id ASC LIMIT 1) as unpaid_bill_amount"),
+                DB::raw("(SELECT b3.due_date FROM bills b3 WHERE b3.user_id = users.id AND b3.status IN ('pending', 'overdue') ORDER BY b3.due_date ASC, b3.id ASC LIMIT 1) as unpaid_bill_due_date")
+            )
             ->get();
 
-        return view('payments.walkin', compact('residents'));
+        $defaultAmount = (float) DB::table('barangays')
+            ->where('id', $barangayId)
+            ->value('payment_amount_per_bill');
+
+        $today = now()->toDateString();
+        $residents = $residents->map(function ($resident) use ($defaultAmount, $today) {
+            $amount = $defaultAmount > 0 ? $defaultAmount : 0.0;
+
+            if (!empty($resident->unpaid_bill_amount)) {
+                $amount = (float) $resident->unpaid_bill_amount;
+                if (!empty($resident->unpaid_bill_due_date) && (string) $resident->unpaid_bill_due_date < $today) {
+                    $amount = $amount * 2;
+                }
+            }
+
+            $resident->walkin_amount = $amount;
+            return $resident;
+        });
+
+        return view('payments.walkin', compact('residents', 'defaultAmount'));
     }
 
     public function storeWalkIn(Request $request)
@@ -433,21 +548,84 @@ class PaymentController extends Controller
 
         $request->validate([
             'user_id' => 'required|exists:users,id',
-            'amount' => 'required|numeric|min:0.01',
         ]);
 
         if ($redirect = $this->requireRoleInBarangay(['treasurer'], (int) $request->user_id, (int) $barangayId)) {
             return $redirect;
         }
 
+        DB::table('bills')
+            ->where('user_id', (int) $request->user_id)
+            ->where('status', 'pending')
+            ->whereDate('due_date', '<', now()->toDateString())
+            ->update([
+                'status' => 'overdue',
+                'updated_at' => now(),
+            ]);
+
+        $unpaidBill = DB::table('bills')
+            ->where('user_id', (int) $request->user_id)
+            ->whereIn('status', ['pending', 'overdue'])
+            ->orderBy('due_date')
+            ->orderBy('id')
+            ->first();
+
+        $amountToPay = (float) DB::table('barangays')
+            ->where('id', $barangayId)
+            ->value('payment_amount_per_bill');
+        if ($amountToPay <= 0) {
+            $amountToPay = 50.0;
+        }
+
+        if ($unpaidBill) {
+            $amountToPay = (float) $unpaidBill->amount;
+            if ((string) $unpaidBill->due_date < now()->toDateString()) {
+                $amountToPay = $amountToPay * 2;
+            }
+        }
+
         $paymentId = DB::table('payments')->insertGetId([
             'user_id' => $request->user_id,
-            'amount' => $request->amount,
+            'amount' => $amountToPay,
             'payment_method' => 1, // cash
             'status' => 3, // approved
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        if ($unpaidBill) {
+            DB::table('bills')->where('id', $unpaidBill->id)->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if ((int) $unpaidBill->is_recurring === 1 && $unpaidBill->recurrence_type === 'monthly') {
+                $nextDueDate = Carbon::parse($unpaidBill->due_date)->addMonthNoOverflow()->toDateString();
+
+                $existsNext = DB::table('bills')
+                    ->where('user_id', (int) $request->user_id)
+                    ->where('bill_name', $unpaidBill->bill_name)
+                    ->whereDate('due_date', $nextDueDate)
+                    ->whereIn('status', ['pending', 'overdue'])
+                    ->exists();
+
+                if (!$existsNext) {
+                    DB::table('bills')->insert([
+                        'user_id' => (int) $request->user_id,
+                        'bill_name' => $unpaidBill->bill_name,
+                        'amount' => $unpaidBill->amount,
+                        'due_date' => $nextDueDate,
+                        'status' => 'pending',
+                        'paid_at' => null,
+                        'is_recurring' => 1,
+                        'recurrence_type' => 'monthly',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        }
 
         Log::info('payments.walkin_created', [
             'actor_id' => session('usr_id'),

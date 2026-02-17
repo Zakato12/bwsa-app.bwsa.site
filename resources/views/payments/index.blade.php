@@ -37,6 +37,7 @@
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'amount', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Method</th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'status', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
+                            <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'due_date', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Due Date {{ $sortBy == 'due_date' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Receipt</th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Actions</th>
@@ -50,7 +51,9 @@
                                 <td>{{ number_format($p->amount, 2) }}</td>
                                 <td>{{ $p->payment_method == 0 ? 'Bill' : ($p->payment_method == 1 ? 'Cash' : 'GCash') }}</td>
                                 <td>
-                                    @if($p->status == 0)
+                                    @if($p->status == -1)
+                                        <span class="badge bg-danger">Overdue Bill</span>
+                                    @elseif($p->status == 0)
                                         <span class="badge bg-secondary">Bill Generated</span>
                                     @elseif($p->status == 1)
                                         <span class="badge bg-warning">Pending</span>
@@ -58,6 +61,13 @@
                                         <span class="badge bg-info">Verified</span>
                                     @else
                                         <span class="badge bg-danger">Failed</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if(!empty($p->due_date))
+                                        {{ \Carbon\Carbon::parse($p->due_date)->format('M d, Y') }}
+                                    @else
+                                        -
                                     @endif
                                 </td>
                                 <td>
@@ -79,13 +89,13 @@
                                 <td>{{ \Carbon\Carbon::parse($p->created_at)->format('M d, Y') }}</td>
                                 <td>
                                     @if(session('usr_role') == 'treasurer')
-                                        @if($p->status == 1 && $p->payment_method == 2)
+                                        @if(($p->row_type ?? 'payment') === 'payment' && $p->status == 1 && $p->payment_method == 2)
                                             <form action="{{ route('payments.verify', $p->id) }}" method="POST" style="display:inline;">
                                                 @csrf
                                                 <button type="submit" class="btn btn-success btn-sm">Verify</button>
                                             </form>
                                         @endif
-                                        @if($p->status == 2)
+                                        @if(($p->row_type ?? 'payment') === 'payment' && $p->status == 2)
                                             <form action="{{ route('payments.approve', $p->id) }}" method="POST" style="display:inline;">
                                                 @csrf
                                                 <button type="submit" class="btn btn-primary btn-sm">Approve</button>
@@ -98,7 +108,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center">No unpaid records found.</td>
+                                <td colspan="9" class="text-center">No unpaid records found.</td>
                             </tr>
                         @endforelse
                     </tbody>
