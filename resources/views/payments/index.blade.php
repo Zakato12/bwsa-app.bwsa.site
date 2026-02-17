@@ -173,9 +173,11 @@
                             <tr>
                                 <th>ID</th>
                                 <th>Bill</th>
-                                <th>Amount</th>
+                                <th>Base Amount</th>
+                                <th>Amount Due</th>
                                 <th>Due Date</th>
                                 <th>Status</th>
+                                <th>Upcoming</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -185,6 +187,7 @@
                                 <td>{{ $bill->id }}</td>
                                 <td>{{ $bill->bill_name }}</td>
                                 <td>{{ number_format($bill->amount, 2) }}</td>
+                                <td>{{ number_format($bill->amount_due ?? $bill->amount, 2) }}</td>
                                 <td>{{ \Carbon\Carbon::parse($bill->due_date)->format('M d, Y') }}</td>
                                 <td>
                                     @if($bill->status === 'overdue')
@@ -194,12 +197,19 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @if((int) ($bill->is_upcoming_due ?? 0) === 1)
+                                        <span class="badge bg-warning text-dark">Due Soon</span>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                                <td>
                                     <a href="{{ route('payments.create') }}?bill_id={{ $bill->id }}" class="btn btn-primary btn-sm">Pay Bill</a>
                                 </td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="6" class="text-center">No bills found.</td>
+                                <td colspan="8" class="text-center">No bills found.</td>
                             </tr>
                             @endforelse
                         </tbody>

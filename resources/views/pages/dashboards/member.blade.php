@@ -18,6 +18,12 @@
                     <div class="stat-data">
                         <h3>{{ number_format($unpaidBills) }}</h3>
                         <p>Total Unpaid Bills</p>
+                        <p class="mt-1 mb-0">
+                            Upcoming (7 days): {{ number_format($upcomingDueBills ?? 0) }}
+                            @if(!empty($nextDueBillDate))
+                                | Next due: {{ \Carbon\Carbon::parse($nextDueBillDate)->format('M d, Y') }}
+                            @endif
+                        </p>
                     </div>
                 </div>
             </div>

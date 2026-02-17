@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\ProcessReceiptOcr;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -33,7 +34,20 @@ class PaymentController extends Controller
 
         $bill = null;
         if (request('bill_id')) {
+            DB::table('bills')
+                ->where('user_id', session('usr_id'))
+                ->where('status', 'pending')
+                ->whereDate('due_date', '<', now()->toDateString())
+                ->update([
+                    'status' => 'overdue',
+                    'updated_at' => now(),
+                ]);
+
             $bill = DB::table('bills')
+                ->select(
+                    'bills.*',
+                    DB::raw("CASE WHEN bills.status IN ('pending','overdue') AND CURDATE() > bills.due_date THEN bills.amount * 2 ELSE bills.amount END AS amount_due")
+                )
                 ->where('id', request('bill_id'))
                 ->where('user_id', session('usr_id'))
                 ->whereIn('status', ['pending', 'overdue'])
@@ -70,6 +84,15 @@ class PaymentController extends Controller
         $userId = session('usr_id');
 
         if ($request->bill_id) {
+            DB::table('bills')
+                ->where('user_id', $userId)
+                ->where('status', 'pending')
+                ->whereDate('due_date', '<', now()->toDateString())
+                ->update([
+                    'status' => 'overdue',
+                    'updated_at' => now(),
+                ]);
+
             // Paying an existing bill
             $bill = DB::table('bills')
                 ->where('id', $request->bill_id)
@@ -81,9 +104,12 @@ class PaymentController extends Controller
                 return redirect()->back()->with('error', 'Invalid bill selected.');
             }
 
+            $isOverdue = now()->toDateString() > (string) $bill->due_date;
+            $amountDue = $isOverdue ? ((float) $bill->amount * 2) : (float) $bill->amount;
+
             $paymentId = DB::table('payments')->insertGetId([
                 'user_id' => $userId,
-                'amount' => $bill->amount,
+                'amount' => $amountDue,
                 'payment_method' => $request->payment_method,
                 'status' => 1,
                 'created_at' => now(),
@@ -95,6 +121,34 @@ class PaymentController extends Controller
                 'paid_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            if ((int) $bill->is_recurring === 1 && in_array($bill->recurrence_type, ['monthly', 'bimonthly'], true)) {
+                $nextDueDate = $bill->recurrence_type === 'bimonthly'
+                    ? Carbon::parse($bill->due_date)->addMonthsNoOverflow(2)->toDateString()
+                    : Carbon::parse($bill->due_date)->addMonthNoOverflow()->toDateString();
+
+                $existingNextBill = DB::table('bills')
+                    ->where('user_id', $userId)
+                    ->where('bill_name', $bill->bill_name)
+                    ->whereDate('due_date', $nextDueDate)
+                    ->whereIn('status', ['pending', 'overdue'])
+                    ->exists();
+
+                if (!$existingNextBill) {
+                    DB::table('bills')->insert([
+                        'user_id' => $userId,
+                        'bill_name' => $bill->bill_name,
+                        'amount' => $bill->amount,
+                        'due_date' => $nextDueDate,
+                        'status' => 'pending',
+                        'paid_at' => null,
+                        'is_recurring' => 1,
+                        'recurrence_type' => $bill->recurrence_type,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
         } else {
             // New payment submission
             $paymentId = DB::table('payments')->insertGetId([
@@ -210,7 +264,21 @@ class PaymentController extends Controller
 
             return view('payments.index', compact('unpaidRecords', 'paidRecords', 'sortBy', 'sortOrder', 'search'));
         } else {
+            DB::table('bills')
+                ->where('user_id', session('usr_id'))
+                ->where('status', 'pending')
+                ->whereDate('due_date', '<', now()->toDateString())
+                ->update([
+                    'status' => 'overdue',
+                    'updated_at' => now(),
+                ]);
+
             $billsQuery = DB::table('bills')
+                ->select(
+                    'bills.*',
+                    DB::raw("CASE WHEN bills.status IN ('pending','overdue') AND CURDATE() > bills.due_date THEN bills.amount * 2 ELSE bills.amount END AS amount_due"),
+                    DB::raw("CASE WHEN bills.status IN ('pending','overdue') AND bills.due_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END AS is_upcoming_due")
+                )
                 ->where('user_id', session('usr_id'))
                 ->whereIn('status', ['pending', 'overdue']);
 
@@ -411,6 +479,7 @@ class PaymentController extends Controller
             'bill_name' => 'required|string|max:150',
             'amount' => 'required|numeric|min:0.01',
             'due_date' => 'required|date',
+            'recurrence_type' => 'required|in:monthly,bimonthly',
         ]);
 
         $residentUserIds = DB::table('residents')
@@ -441,8 +510,8 @@ class PaymentController extends Controller
                 'due_date' => $validated['due_date'],
                 'status' => 'pending',
                 'paid_at' => null,
-                'is_recurring' => 0,
-                'recurrence_type' => null,
+                'is_recurring' => 1,
+                'recurrence_type' => $validated['recurrence_type'],
                 'created_at' => $now,
                 'updated_at' => $now,
             ];

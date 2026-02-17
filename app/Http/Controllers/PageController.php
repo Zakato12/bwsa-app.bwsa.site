@@ -120,13 +120,23 @@ class PageController extends Controller
                         ->where('user_id', $userId)
                         ->whereIn('status', ['pending', 'overdue'])
                         ->count();
+                    $upcomingDueBills = DB::table('bills')
+                        ->where('user_id', $userId)
+                        ->whereIn('status', ['pending', 'overdue'])
+                        ->whereBetween('due_date', [now()->toDateString(), now()->addDays(7)->toDateString()])
+                        ->count();
+                    $nextDueBillDate = DB::table('bills')
+                        ->where('user_id', $userId)
+                        ->whereIn('status', ['pending', 'overdue'])
+                        ->orderBy('due_date')
+                        ->value('due_date');
                     $recentPayments = DB::table('payments')
                         ->where('user_id', $userId)
                         ->orderBy('created_at', 'desc')
                         ->limit(5)
                         ->get();
 
-                    return view('pages.dashboards.member', compact('unpaidBills', 'recentPayments'));
+                    return view('pages.dashboards.member', compact('unpaidBills', 'upcomingDueBills', 'nextDueBillDate', 'recentPayments'));
                 default:
                     return redirect()->action([PageController::class, 'showLogin'])->with('error','Invalid Login Credentials.');
             }
