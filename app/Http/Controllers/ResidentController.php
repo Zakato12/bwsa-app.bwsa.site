@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ResidentController extends Controller
 {
@@ -65,8 +66,29 @@ class ResidentController extends Controller
         }
 
         $validated = $request->validate([
-            'full_name' => 'required|string|max:100',
-            'address' => 'required|string|max:255',
+            'full_name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('users', 'full_name')->where(fn ($q) => $q->where('role_id', 4)),
+            ],
+            'address' => ['required', Rule::in([
+                'Purok 1',
+                'Purok 2',
+                'Purok 3',
+                'Purok 4',
+                'Purok 5',
+                'Purok 6',
+                'Purok 7',
+                'Purok 8',
+                'Purok 9',
+                'Purok 10',
+            ])],
+            'contact_number' => 'nullable|string|max:20|regex:/^[0-9+\\-\\s()]{7,20}$/',
+        ], [
+            'full_name.unique' => 'This resident full name already exists.',
+            'address.in' => 'Please select a valid Purok.',
+            'contact_number.regex' => 'Contact number format is invalid.',
         ]);
 
         $barangayId = $this->currentUserBarangayId();
@@ -91,6 +113,7 @@ class ResidentController extends Controller
             'user_id' => $userId,
             'barangay_id' => $barangayId,
             'address' => $validated['address'],
+            'contact_number' => $validated['contact_number'] ?? null,
             'created_at' => now(),
         ]);
 
@@ -134,11 +157,36 @@ class ResidentController extends Controller
             return $redirect;
         }
 
+        $residentUserId = DB::table('residents')->where('id', $id)->value('user_id');
+
         $validated = $request->validate([
-            'username' => 'required|string|max:50|unique:users,username,' . DB::table('residents')->where('id', $id)->value('user_id') . ',id',
-            'full_name' => 'required|string|max:100',
-            'address' => 'required|string|max:255',
+            'username' => 'required|string|max:50|unique:users,username,' . $residentUserId . ',id',
+            'full_name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('users', 'full_name')
+                    ->ignore($residentUserId, 'id')
+                    ->where(fn ($q) => $q->where('role_id', 4)),
+            ],
+            'address' => ['required', Rule::in([
+                'Purok 1',
+                'Purok 2',
+                'Purok 3',
+                'Purok 4',
+                'Purok 5',
+                'Purok 6',
+                'Purok 7',
+                'Purok 8',
+                'Purok 9',
+                'Purok 10',
+            ])],
+            'contact_number' => 'nullable|string|max:20|regex:/^[0-9+\\-\\s()]{7,20}$/',
             'barangay_id' => 'required|exists:barangays,id',
+        ], [
+            'full_name.unique' => 'This resident full name already exists.',
+            'address.in' => 'Please select a valid Purok.',
+            'contact_number.regex' => 'Contact number format is invalid.',
         ]);
 
         $resident = DB::table('residents')->where('id', $id)->first();
@@ -159,6 +207,7 @@ class ResidentController extends Controller
         DB::table('residents')->where('id', $id)->update([
             'barangay_id' => $validated['barangay_id'],
             'address' => $validated['address'],
+            'contact_number' => $validated['contact_number'] ?? null,
         ]);
 
         return redirect()->route('residents.index')->with('success', 'Resident updated successfully');
