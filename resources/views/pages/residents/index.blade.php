@@ -28,7 +28,7 @@
                     <th>ID</th>
                     <th>Full Name</th>
                     <th>Username</th>
-                    <th>Barangay</th>
+                    <th>Address</th>
                     <th>Created At</th>
                     @if(in_array(session('usr_role'), ['admin', 'official']))
                         <th>Actions</th>
@@ -41,7 +41,7 @@
                     <td>{{ $resident->id }}</td>
                     <td>{{ $resident->full_name }}</td>
                     <td>{{ $resident->username }}</td>
-                    <td>{{ $resident->barangay }}</td>
+                    <td>{{ $resident->Address }}</td>
                     <td>{{ $resident->created_at }}</td>
                     @if(in_array(session('usr_role'), ['admin', 'official']))
                         <td>
