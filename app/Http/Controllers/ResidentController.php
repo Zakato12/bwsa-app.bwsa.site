@@ -173,16 +173,14 @@ class ResidentController extends Controller
             return $redirect;
         }
 
-        $validated = $request->validate([
+        $currentUser = DB::table('users')
+            ->where('id', $resident->user_id)
+            ->select('full_name', 'username')
+            ->first();
+
+        $rules = [
             'username' => 'required|string|max:50|unique:users,username,' . $resident->user_id . ',id',
-            'full_name' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('users', 'full_name')
-                    ->ignore($resident->user_id, 'id')
-                    ->where(fn ($q) => $q->where('role_id', 4)),
-            ],
+            'full_name' => ['required', 'string', 'max:100'],
             'address' => ['required', Rule::in([
                 'Purok 1',
                 'Purok 2',
@@ -200,10 +198,24 @@ class ResidentController extends Controller
                 'string',
                 'max:20',
                 'regex:/^[0-9+\\-\\s()]{7,20}$/',
-                Rule::unique('residents', 'contact_number')->ignore($resident->id, 'id'),
             ],
             'barangay_id' => 'required|exists:barangays,id',
-        ], [
+        ];
+
+        $incomingFullName = trim((string) $request->input('full_name'));
+        $currentFullName = trim((string) ($currentUser->full_name ?? ''));
+        if ($incomingFullName !== $currentFullName) {
+            $rules['full_name'][] = Rule::unique('users', 'full_name')
+                ->where(fn ($q) => $q->where('role_id', 4));
+        }
+
+        $incomingContact = trim((string) $request->input('contact_number', ''));
+        $currentContact = trim((string) ($resident->contact_number ?? ''));
+        if ($incomingContact !== $currentContact) {
+            $rules['contact_number'][] = Rule::unique('residents', 'contact_number');
+        }
+
+        $validated = $request->validate($rules, [
             'full_name.unique' => 'This resident full name already exists.',
             'address.in' => 'Please select a valid Purok.',
             'contact_number.regex' => 'Contact number format is invalid.',
