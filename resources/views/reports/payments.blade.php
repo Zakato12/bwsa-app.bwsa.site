@@ -12,6 +12,31 @@
         <button class="btn btn-outline-primary" onclick="window.print()">Print</button>
     </div>
 
+    <form method="GET" action="{{ route('reports.payments') }}" class="row g-2 mb-3">
+        <div class="col-md-3">
+            <select name="month" class="form-control">
+                <option value="0">All Months</option>
+                @for($m = 1; $m <= 12; $m++)
+                    <option value="{{ $m }}" {{ (int) ($month ?? 0) === $m ? 'selected' : '' }}>
+                        {{ \Carbon\Carbon::create(null, $m, 1)->format('F') }}
+                    </option>
+                @endfor
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="year" class="form-control">
+                <option value="0">All Years</option>
+                @foreach(($yearOptions ?? collect()) as $y)
+                    <option value="{{ $y }}" {{ (int) ($year ?? 0) === (int) $y ? 'selected' : '' }}>{{ $y }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-md-6 d-flex gap-2">
+            <button type="submit" class="btn btn-outline-primary">Apply Filter</button>
+            <a href="{{ route('reports.payments') }}" class="btn btn-outline-secondary">Reset</a>
+        </div>
+    </form>
+
     <div class="row mb-3">
         <div class="col-md-3 mb-2">
             <div class="card shadow-sm">

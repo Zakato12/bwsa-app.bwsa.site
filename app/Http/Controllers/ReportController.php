@@ -54,7 +54,16 @@ class ReportController extends Controller
             ->where('id', $barangayId)
             ->first();
 
-        $payments = DB::table('payments')
+        $month = (int) request('month', 0);
+        $year = (int) request('year', 0);
+        if ($month < 1 || $month > 12) {
+            $month = 0;
+        }
+        if ($year < 2000 || $year > 2100) {
+            $year = 0;
+        }
+
+        $baseQuery = DB::table('payments')
             ->join('users', 'payments.user_id', '=', 'users.id')
             ->join('residents', 'residents.user_id', '=', 'users.id')
             ->where('residents.barangay_id', $barangayId)
@@ -66,9 +75,29 @@ class ReportController extends Controller
                 'payments.payment_method',
                 'payments.status',
                 'payments.created_at'
-            )
+            );
+
+        if ($month > 0) {
+            $baseQuery->whereMonth('payments.created_at', $month);
+        }
+        if ($year > 0) {
+            $baseQuery->whereYear('payments.created_at', $year);
+        }
+
+        $payments = (clone $baseQuery)
             ->orderBy('payments.created_at', 'desc')
             ->get();
+
+        $yearOptions = DB::table('payments')
+            ->join('residents', 'residents.user_id', '=', 'payments.user_id')
+            ->where('residents.barangay_id', $barangayId)
+            ->selectRaw('YEAR(payments.created_at) as year_value')
+            ->whereNotNull('payments.created_at')
+            ->distinct()
+            ->orderBy('year_value', 'desc')
+            ->pluck('year_value')
+            ->filter()
+            ->values();
 
         $summary = [
             'total_transactions' => $payments->count(),
@@ -77,7 +106,7 @@ class ReportController extends Controller
             'approved_amount' => (float) $payments->where('status', 3)->sum('amount'),
         ];
 
-        return view('reports.payments', compact('barangay', 'payments', 'summary'));
+        return view('reports.payments', compact('barangay', 'payments', 'summary', 'month', 'year', 'yearOptions'));
     }
 
     public function billingHistory()
