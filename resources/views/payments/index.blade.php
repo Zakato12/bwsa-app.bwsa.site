@@ -17,6 +17,24 @@
         <div class="col-sm-8 col-md-5">
             <input type="text" name="q" class="form-control" placeholder="Search by ID, user, or amount" value="{{ $search ?? '' }}">
         </div>
+        <div class="col-sm-4 col-md-2">
+            <select name="month" class="form-control">
+                <option value="0">All Months</option>
+                @for($m = 1; $m <= 12; $m++)
+                    <option value="{{ $m }}" {{ (int) ($month ?? 0) === $m ? 'selected' : '' }}>
+                        {{ \Carbon\Carbon::create(null, $m, 1)->format('F') }}
+                    </option>
+                @endfor
+            </select>
+        </div>
+        <div class="col-sm-4 col-md-2">
+            <select name="year" class="form-control">
+                <option value="0">All Years</option>
+                @foreach(($yearOptions ?? collect()) as $y)
+                    <option value="{{ $y }}" {{ (int) ($year ?? 0) === (int) $y ? 'selected' : '' }}>{{ $y }}</option>
+                @endforeach
+            </select>
+        </div>
         <div class="col-auto">
             <button type="submit" class="btn btn-outline-primary">Search</button>
         </div>

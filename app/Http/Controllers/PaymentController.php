@@ -207,6 +207,15 @@ class PaymentController extends Controller
         $search = trim((string) request('q', ''));
         $sortBy = request('sort_by', 'created_at');
         $sortOrder = request('sort_order', 'desc');
+        $month = (int) request('month', 0);
+        $year = (int) request('year', 0);
+
+        if ($month < 1 || $month > 12) {
+            $month = 0;
+        }
+        if ($year < 2000 || $year > 2100) {
+            $year = 0;
+        }
 
         $allowedSort = ['created_at', 'amount', 'status', 'due_date'];
         if (!in_array($sortBy, $allowedSort, true)) {
@@ -269,6 +278,12 @@ class PaymentController extends Controller
                         ->orWhere('bills.bill_name', 'like', '%' . $search . '%');
                 });
             }
+            if ($month > 0) {
+                $unpaidBillsQuery->whereMonth('bills.created_at', $month);
+            }
+            if ($year > 0) {
+                $unpaidBillsQuery->whereYear('bills.created_at', $year);
+            }
 
             $unpaidPaymentsQuery = DB::table('payments')
                 ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
@@ -307,6 +322,12 @@ class PaymentController extends Controller
                         ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
                 });
             }
+            if ($month > 0) {
+                $unpaidPaymentsQuery->whereMonth('payments.created_at', $month);
+            }
+            if ($year > 0) {
+                $unpaidPaymentsQuery->whereYear('payments.created_at', $year);
+            }
 
             $unpaidRecords = DB::query()
                 ->fromSub($unpaidBillsQuery->unionAll($unpaidPaymentsQuery), 'unpaid_rows')
@@ -343,13 +364,33 @@ class PaymentController extends Controller
                         ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
                 });
             }
+            if ($month > 0) {
+                $paidBaseQuery->whereMonth('payments.created_at', $month);
+            }
+            if ($year > 0) {
+                $paidBaseQuery->whereYear('payments.created_at', $year);
+            }
 
             $paidRecords = $paidBaseQuery
                 ->orderBy($sortBy === 'due_date' ? 'created_at' : $sortBy, $sortOrder)
                 ->paginate(10, ['*'], 'paid_page')
                 ->withQueryString();
 
-            return view('payments.index', compact('unpaidRecords', 'paidRecords', 'sortBy', 'sortOrder', 'search'));
+            $yearsQuery = DB::table('payments');
+            if ($isScopedToBarangay) {
+                $yearsQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
+                    ->where('residents.barangay_id', $barangayId);
+            }
+            $yearOptions = $yearsQuery
+                ->selectRaw('YEAR(payments.created_at) as year_value')
+                ->whereNotNull('payments.created_at')
+                ->distinct()
+                ->orderBy('year_value', 'desc')
+                ->pluck('year_value')
+                ->filter()
+                ->values();
+
+            return view('payments.index', compact('unpaidRecords', 'paidRecords', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions'));
         } else {
             DB::table('bills')
                 ->where('user_id', session('usr_id'))
@@ -395,13 +436,29 @@ class PaymentController extends Controller
                         ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
                 });
             }
+            if ($month > 0) {
+                $paymentsQuery->whereMonth('payments.created_at', $month);
+            }
+            if ($year > 0) {
+                $paymentsQuery->whereYear('payments.created_at', $year);
+            }
 
             $payments = $paymentsQuery
                 ->orderBy($sortBy, $sortOrder)
                 ->paginate(10, ['*'], 'my_payments_page')
                 ->withQueryString();
 
-            return view('payments.index', compact('bills', 'payments', 'sortBy', 'sortOrder', 'search'));
+            $yearOptions = DB::table('payments')
+                ->where('user_id', session('usr_id'))
+                ->selectRaw('YEAR(created_at) as year_value')
+                ->whereNotNull('created_at')
+                ->distinct()
+                ->orderBy('year_value', 'desc')
+                ->pluck('year_value')
+                ->filter()
+                ->values();
+
+            return view('payments.index', compact('bills', 'payments', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions'));
         }
     }
 
