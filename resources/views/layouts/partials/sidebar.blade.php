@@ -102,11 +102,17 @@
                             <li class="{{ request()->is('reports/residents') ? 'active' : '' }}">
                                 <a href="{{ route('reports.residents') }}">Resident List Report</a>
                             </li>
+                            <li class="{{ request()->is('reports/billing-history') ? 'active' : '' }}">
+                                <a href="{{ route('reports.billing_history') }}">Billing History</a>
+                            </li>
                         @endif
 
                         @if (session('usr_role') == 'treasurer')
                             <li class="{{ request()->is('reports/payments') ? 'active' : '' }}">
                                 <a href="{{ route('reports.payments') }}">Payment Report</a>
+                            </li>
+                            <li class="{{ request()->is('reports/billing-history') ? 'active' : '' }}">
+                                <a href="{{ route('reports.billing_history') }}">Billing History</a>
                             </li>
                         @endif
                     </ul>

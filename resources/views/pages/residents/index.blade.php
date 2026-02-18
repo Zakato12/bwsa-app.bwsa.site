@@ -41,7 +41,7 @@
                     <td>{{ $resident->id }}</td>
                     <td>{{ $resident->full_name }}</td>
                     <td>{{ $resident->username }}</td>
-                    <td>{{ $resident->Address }}</td>
+                    <td>{{ $resident->address }}</td>
                     <td>{{ $resident->created_at }}</td>
                     @if(in_array(session('usr_role'), ['admin', 'official']))
                         <td>

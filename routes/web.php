@@ -55,4 +55,5 @@ Route::middleware(['session.auth', 'session.timeout'])->group(function () {
     // REPORTS
     Route::get('/reports/residents', [ReportController::class, 'residents'])->name('reports.residents')->middleware('role:official');
     Route::get('/reports/payments', [ReportController::class, 'payments'])->name('reports.payments')->middleware('role:treasurer');
+    Route::get('/reports/billing-history', [ReportController::class, 'billingHistory'])->name('reports.billing_history')->middleware('role:official,treasurer');
 });
