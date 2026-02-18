@@ -19,7 +19,7 @@ class ResidentController extends Controller
         $query = DB::table('residents')
             ->join('users', 'residents.user_id', '=', 'users.id')
             ->join('barangays', 'residents.barangay_id', '=', 'barangays.id')
-            ->select('residents.id', 'users.full_name', 'users.username', 'barangays.name as barangay', 'residents.created_at')
+            ->select('residents.id', 'users.full_name', 'users.username', 'barangays.name as barangay', 'residents.created_at', 'residents.address', 'residents.contact_number')
             ->where('users.status', 'active')
             ->orderBy('residents.created_at', 'desc');
 
