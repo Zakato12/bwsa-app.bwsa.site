@@ -164,16 +164,23 @@ class ResidentController extends Controller
             return $redirect;
         }
 
-        $residentUserId = DB::table('residents')->where('id', $id)->value('user_id');
+        $resident = DB::table('residents')->where('id', $id)->first();
+        if (!$resident) {
+            return redirect()->route('residents.index')->with('error', 'Resident not found');
+        }
+
+        if ($redirect = $this->requireRoleInBarangay(['official'], (int) $resident->user_id)) {
+            return $redirect;
+        }
 
         $validated = $request->validate([
-            'username' => 'required|string|max:50|unique:users,username,' . $residentUserId . ',id',
+            'username' => 'required|string|max:50|unique:users,username,' . $resident->user_id . ',id',
             'full_name' => [
                 'required',
                 'string',
                 'max:100',
                 Rule::unique('users', 'full_name')
-                    ->ignore($residentUserId, 'id')
+                    ->ignore($resident->user_id, 'id')
                     ->where(fn ($q) => $q->where('role_id', 4)),
             ],
             'address' => ['required', Rule::in([
@@ -193,7 +200,7 @@ class ResidentController extends Controller
                 'string',
                 'max:20',
                 'regex:/^[0-9+\\-\\s()]{7,20}$/',
-                Rule::unique('residents', 'contact_number')->ignore($id, 'id'),
+                Rule::unique('residents', 'contact_number')->ignore($resident->id, 'id'),
             ],
             'barangay_id' => 'required|exists:barangays,id',
         ], [
@@ -202,11 +209,6 @@ class ResidentController extends Controller
             'contact_number.regex' => 'Contact number format is invalid.',
             'contact_number.unique' => 'This contact number is already in use.',
         ]);
-
-        $resident = DB::table('residents')->where('id', $id)->first();
-        if (!$resident) {
-            return redirect()->route('residents.index')->with('error', 'Resident not found');
-        }
 
         if ($redirect = $this->requireRoleInBarangay(['official'], (int) $resident->user_id, (int) $validated['barangay_id'])) {
             return $redirect;
