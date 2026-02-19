@@ -145,6 +145,7 @@
                         <tr>
                             <th>ID</th>
                             <th>User</th>
+                            <th>Bill Name</th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'amount', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Method</th>
                             <th>Status</th>
@@ -157,6 +158,7 @@
                             <tr>
                                 <td>{{ $p->id }}</td>
                                 <td>{{ $p->full_name ?? $p->user_name }}</td>
+                                <td>{{ $p->bill_name ?? '-' }}</td>
                                 <td>{{ number_format($p->amount, 2) }}</td>
                                 <td>{{ $p->payment_method == 1 ? 'Cash' : 'GCash' }}</td>
                                 <td><span class="badge bg-success">Approved</span></td>
@@ -180,7 +182,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center">No paid records found.</td>
+                                <td colspan="8" class="text-center">No paid records found.</td>
                             </tr>
                         @endforelse
                     </tbody>

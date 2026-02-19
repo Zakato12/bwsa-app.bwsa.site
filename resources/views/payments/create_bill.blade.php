@@ -22,16 +22,12 @@
                             <input type="text" class="form-control" value="{{ $residentCount }}" readonly>
                         </div>
                         <div class="mb-3">
-                            <label for="bill_name" class="form-label">Bill Name</label>
+                            <label class="form-label">Bill Name</label>
                             <input
                                 type="text"
-                                name="bill_name"
-                                id="bill_name"
                                 class="form-control"
-                                maxlength="150"
-                                value="{{ old('bill_name') }}"
-                                placeholder="e.g. Monthly Water Bill"
-                                required
+                                value="Auto-generated from due month (e.g., February Bill)"
+                                readonly
                             >
                         </div>
                         <div class="mb-3">

@@ -17,8 +17,9 @@
                         </div>
                     @endif
 
-                    <form action="{{ route('payments.store') }}" method="POST" enctype="multipart/form-data">
+                    <form id="gcashPaymentForm" action="{{ route('payments.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
+                        <input type="hidden" name="submission_token" value="{{ $submissionToken ?? '' }}">
                         @if($bill)
                             <input type="hidden" name="bill_id" value="{{ $bill->id }}">
                             <div class="mb-3">
@@ -56,7 +57,7 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        <button type="submit" class="btn btn-primary">{{ $bill ? 'Pay Bill' : 'Submit Payment' }}</button>
+                        <button type="submit" class="btn btn-primary" id="gcashSubmitBtn">{{ $bill ? 'Pay Bill' : 'Submit Payment' }}</button>
                         <a href="{{ route('payments.index') }}" class="btn btn-secondary">Cancel</a>
                     </form>
                 </div>
@@ -65,4 +66,18 @@
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('gcashPaymentForm');
+    const submitBtn = document.getElementById('gcashSubmitBtn');
+    if (!form || !submitBtn) {
+        return;
+    }
+
+    form.addEventListener('submit', function () {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+    });
+});
+</script>
 @endsection

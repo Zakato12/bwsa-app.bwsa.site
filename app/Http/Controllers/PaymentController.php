@@ -8,12 +8,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class PaymentController extends Controller
 {
+    private function monthlyBillNameForDate($date): string
+    {
+        return Carbon::parse($date)->format('F') . ' Bill';
+    }
+
     private function receiptDisk(): string
     {
         $configured = env('RECEIPT_DISK', 'private');
@@ -53,7 +59,11 @@ class PaymentController extends Controller
                 ->whereIn('status', ['pending', 'overdue'])
                 ->first();
         }
-        return view('payments.create', compact('bill'));
+
+        $submissionToken = Str::random(40);
+        session(['payments_submission_token' => $submissionToken]);
+
+        return view('payments.create', compact('bill', 'submissionToken'));
     }
 
     public function store(Request $request)
@@ -66,13 +76,22 @@ class PaymentController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'payment_method' => 'required|in:2',
             'receipt' => 'required|file|mimes:jpeg,jpg,png|mimetypes:image/jpeg,image/png|max:2048',
+            'submission_token' => 'required|string',
         ], [
             'receipt.required' => 'Receipt is required.',
             'receipt.file' => 'Receipt must be a file upload.',
             'receipt.mimes' => 'Invalid file type. Upload JPG, JPEG, or PNG only.',
             'receipt.mimetypes' => 'Invalid receipt file content. Upload a valid image file.',
             'receipt.max' => 'Receipt must not exceed 2MB.',
+            'submission_token.required' => 'Session expired. Please open the payment form again.',
         ]);
+
+        $sessionToken = (string) session('payments_submission_token', '');
+        $submittedToken = (string) $request->input('submission_token', '');
+        if ($sessionToken === '' || $submittedToken === '' || !hash_equals($sessionToken, $submittedToken)) {
+            return redirect()->route('payments.create', ['bill_id' => $request->bill_id])->with('error', 'Duplicate or expired submission detected. Please try again.');
+        }
+        session()->forget('payments_submission_token');
 
         $receipt = $request->file('receipt');
         if (!$receipt instanceof UploadedFile || !$this->isSafeReceiptImage($receipt)) {
@@ -82,6 +101,7 @@ class PaymentController extends Controller
         }
 
         $userId = session('usr_id');
+        $amountToCheck = (float) $request->amount;
 
         if ($request->bill_id) {
             DB::table('bills')
@@ -93,61 +113,101 @@ class PaymentController extends Controller
                     'updated_at' => now(),
                 ]);
 
-            // Paying an existing bill
-            $bill = DB::table('bills')
-                ->where('id', $request->bill_id)
-                ->where('user_id', $userId)
-                ->whereIn('status', ['pending', 'overdue'])
-                ->first();
-
-            if (!$bill) {
-                return redirect()->back()->with('error', 'Invalid bill selected.');
-            }
-
-            $isOverdue = now()->toDateString() > (string) $bill->due_date;
-            $amountDue = $isOverdue ? ((float) $bill->amount * 2) : (float) $bill->amount;
-
-            $paymentId = DB::table('payments')->insertGetId([
-                'user_id' => $userId,
-                'amount' => $amountDue,
-                'payment_method' => $request->payment_method,
-                'status' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            DB::table('bills')->where('id', $request->bill_id)->update([
-                'status' => 'paid',
-                'paid_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            if ((int) $bill->is_recurring === 1 && $bill->recurrence_type === 'monthly') {
-                $nextDueDate = Carbon::parse($bill->due_date)->addMonthNoOverflow()->toDateString();
-
-                $existingNextBill = DB::table('bills')
+            $result = DB::transaction(function () use ($request, $userId, &$amountToCheck) {
+                // Lock bill row to prevent two payments for the same bill in concurrent requests.
+                $bill = DB::table('bills')
+                    ->where('id', $request->bill_id)
                     ->where('user_id', $userId)
-                    ->where('bill_name', $bill->bill_name)
-                    ->whereDate('due_date', $nextDueDate)
                     ->whereIn('status', ['pending', 'overdue'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$bill) {
+                    return ['state' => 'bill_unavailable'];
+                }
+
+                $isOverdue = now()->toDateString() > (string) $bill->due_date;
+                $amountDue = $isOverdue ? ((float) $bill->amount * 2) : (float) $bill->amount;
+                $amountToCheck = $amountDue;
+
+                $recentDuplicate = DB::table('payments')
+                    ->where('user_id', $userId)
+                    ->where('payment_method', 2)
+                    ->where('status', 1)
+                    ->where('amount', $amountToCheck)
+                    ->where('created_at', '>=', now()->subMinute())
                     ->exists();
 
-                if (!$existingNextBill) {
-                    DB::table('bills')->insert([
-                        'user_id' => $userId,
-                        'bill_name' => $bill->bill_name,
-                        'amount' => $bill->amount,
-                        'due_date' => $nextDueDate,
-                        'status' => 'pending',
-                        'paid_at' => null,
-                        'is_recurring' => 1,
-                        'recurrence_type' => $bill->recurrence_type,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
+                if ($recentDuplicate) {
+                    return ['state' => 'duplicate'];
                 }
+
+                $paymentId = DB::table('payments')->insertGetId([
+                    'user_id' => $userId,
+                    'amount' => $amountDue,
+                    'payment_method' => $request->payment_method,
+                    'status' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                DB::table('bills')->where('id', $request->bill_id)->update([
+                    'status' => 'paid',
+                    'paid_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                if ((int) $bill->is_recurring === 1 && $bill->recurrence_type === 'monthly') {
+                    $nextDueDate = Carbon::parse($bill->due_date)->addMonthNoOverflow()->toDateString();
+                    $nextBillName = $this->monthlyBillNameForDate($nextDueDate);
+
+                    $existingNextBill = DB::table('bills')
+                        ->where('user_id', $userId)
+                        ->where('bill_name', $nextBillName)
+                        ->whereDate('due_date', $nextDueDate)
+                        ->whereIn('status', ['pending', 'overdue'])
+                        ->exists();
+
+                    if (!$existingNextBill) {
+                        DB::table('bills')->insert([
+                            'user_id' => $userId,
+                            'bill_name' => $nextBillName,
+                            'amount' => $bill->amount,
+                            'due_date' => $nextDueDate,
+                            'status' => 'pending',
+                            'paid_at' => null,
+                            'is_recurring' => 1,
+                            'recurrence_type' => $bill->recurrence_type,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
+                return ['state' => 'created', 'payment_id' => $paymentId];
+            });
+
+            if (($result['state'] ?? null) === 'bill_unavailable') {
+                return redirect()->route('payments.index')->with('error', 'This bill is already paid or unavailable.');
             }
+            if (($result['state'] ?? null) === 'duplicate') {
+                return redirect()->route('payments.index')->with('success', 'Payment already submitted. Please wait for verification.');
+            }
+
+            $paymentId = (int) ($result['payment_id'] ?? 0);
         } else {
+            $recentDuplicate = DB::table('payments')
+                ->where('user_id', $userId)
+                ->where('payment_method', 2)
+                ->where('status', 1)
+                ->where('amount', $amountToCheck)
+                ->where('created_at', '>=', now()->subMinute())
+                ->exists();
+
+            if ($recentDuplicate) {
+                return redirect()->route('payments.index')->with('success', 'Payment already submitted. Please wait for verification.');
+            }
+
             // New payment submission
             $paymentId = DB::table('payments')->insertGetId([
                 'user_id' => $userId,
@@ -340,6 +400,7 @@ class PaymentController extends Controller
                 ->leftJoin('users', 'payments.user_id', '=', 'users.id')
                 ->select(
                     'payments.*',
+                    DB::raw("(SELECT b.bill_name FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60 ORDER BY ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) ASC, b.id DESC LIMIT 1) as bill_name"),
                     'gcash_payments.ocr_text',
                     'gcash_payments.extracted_amount',
                     'gcash_payments.extracted_reference',
@@ -361,7 +422,8 @@ class PaymentController extends Controller
                     $q->where('users.username', 'like', '%' . $search . '%')
                         ->orWhere('users.full_name', 'like', '%' . $search . '%')
                         ->orWhereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
-                        ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+                        ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw("EXISTS (SELECT 1 FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.bill_name LIKE ? AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60)", ['%' . $search . '%']);
                 });
             }
             if ($month > 0) {
@@ -659,10 +721,11 @@ class PaymentController extends Controller
 
             if ((int) $unpaidBill->is_recurring === 1 && $unpaidBill->recurrence_type === 'monthly') {
                 $nextDueDate = Carbon::parse($unpaidBill->due_date)->addMonthNoOverflow()->toDateString();
+                $nextBillName = $this->monthlyBillNameForDate($nextDueDate);
 
                 $existsNext = DB::table('bills')
                     ->where('user_id', (int) $request->user_id)
-                    ->where('bill_name', $unpaidBill->bill_name)
+                    ->where('bill_name', $nextBillName)
                     ->whereDate('due_date', $nextDueDate)
                     ->whereIn('status', ['pending', 'overdue'])
                     ->exists();
@@ -670,7 +733,7 @@ class PaymentController extends Controller
                 if (!$existsNext) {
                     DB::table('bills')->insert([
                         'user_id' => (int) $request->user_id,
-                        'bill_name' => $unpaidBill->bill_name,
+                        'bill_name' => $nextBillName,
                         'amount' => $unpaidBill->amount,
                         'due_date' => $nextDueDate,
                         'status' => 'pending',
@@ -709,10 +772,10 @@ class PaymentController extends Controller
         }
 
         $validated = $request->validate([
-            'bill_name' => 'required|string|max:150',
             'amount' => 'required|numeric|min:0.01',
             'due_date' => 'required|date',
         ]);
+        $billName = $this->monthlyBillNameForDate($validated['due_date']);
 
         $residentUserIds = DB::table('residents')
             ->where('barangay_id', $barangayId)
@@ -737,7 +800,7 @@ class PaymentController extends Controller
         foreach ($billableUserIds as $userId) {
             $rows[] = [
                 'user_id' => $userId,
-                'bill_name' => $validated['bill_name'],
+                'bill_name' => $billName,
                 'amount' => $validated['amount'],
                 'due_date' => $validated['due_date'],
                 'status' => 'pending',
