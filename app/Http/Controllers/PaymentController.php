@@ -527,6 +527,12 @@ class PaymentController extends Controller
                     'updated_at' => now(),
                 ]);
 
+            $unpaidBillCount = (int) DB::table('bills')
+                ->where('user_id', session('usr_id'))
+                ->whereIn('status', ['pending', 'overdue'])
+                ->count();
+            $cutoffNoticeActive = $unpaidBillCount >= 3;
+
             $billsQuery = DB::table('bills')
                 ->select(
                     'bills.*',
@@ -584,7 +590,7 @@ class PaymentController extends Controller
                 ->filter()
                 ->values();
 
-            return view('payments.index', compact('bills', 'payments', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions'));
+            return view('payments.index', compact('bills', 'payments', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions', 'unpaidBillCount', 'cutoffNoticeActive'));
         }
     }
 
@@ -851,14 +857,14 @@ class PaymentController extends Controller
             return redirect()->back()->with('error', 'No residents found in your barangay.');
         }
 
-        $existingUnpaid = DB::table('bills')
+        $existingSameCycle = DB::table('bills')
             ->whereIn('user_id', $residentUserIds)
-            ->whereIn('status', ['pending', 'overdue'])
+            ->whereDate('due_date', $validated['due_date'])
             ->pluck('user_id')
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        $billableUserIds = array_values(array_diff($residentUserIds, $existingUnpaid));
+        $billableUserIds = array_values(array_diff($residentUserIds, $existingSameCycle));
         $now = now();
         $rows = [];
         foreach ($billableUserIds as $userId) {
@@ -884,18 +890,18 @@ class PaymentController extends Controller
             'actor_id' => session('usr_id'),
             'barangay_id' => $barangayId,
             'generated_count' => count($rows),
-            'skipped_count' => count($existingUnpaid),
+            'skipped_count' => count($existingSameCycle),
         ]);
         $this->appendAuditLedger('payments.bill_batch_created', [
             'barangay_id' => $barangayId,
             'generated_count' => count($rows),
-            'skipped_count' => count($existingUnpaid),
+            'skipped_count' => count($existingSameCycle),
             'amount' => (float) $validated['amount'],
         ]);
 
         return redirect()->route('payments.index')->with(
             'success',
-            'Bills generated: ' . count($rows) . '. Skipped (already has pending/overdue bill): ' . count($existingUnpaid) . '.'
+            'Bills generated: ' . count($rows) . '. Skipped (already has bill for this due date): ' . count($existingSameCycle) . '.'
         );
     }
 

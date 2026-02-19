@@ -193,6 +193,11 @@
         <div class="row">
             <div class="col-md-6">
                 <h3>My Bills</h3>
+                @if(($cutoffNoticeActive ?? false) === true)
+                    <div class="alert alert-danger">
+                        Cut-off notice: You currently have {{ $unpaidBillCount ?? 0 }} unpaid/overdue bills. Please settle your balance to avoid service disconnection.
+                    </div>
+                @endif
                 <div class="table-responsive">
                     <table class="table table-striped">
                         <thead>
