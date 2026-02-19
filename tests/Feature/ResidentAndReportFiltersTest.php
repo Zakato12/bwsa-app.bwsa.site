@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -15,20 +14,27 @@ class ResidentAndReportFiltersTest extends TestCase
     {
         parent::setUp();
 
-        if (!extension_loaded('pdo_sqlite')) {
-            $this->markTestSkipped('pdo_sqlite extension is not enabled in this environment.');
+        $connection = DB::connection();
+        $driver = $connection->getDriverName();
+        if ($driver !== 'mysql') {
+            $this->markTestSkipped('This test class is configured for MySQL test database only.');
         }
 
-        Config::set('database.default', 'sqlite');
-        Config::set('database.connections.sqlite.database', ':memory:');
-        DB::purge('sqlite');
-        DB::reconnect('sqlite');
+        $databaseName = (string) $connection->getDatabaseName();
+        if ($databaseName === '' || stripos($databaseName, 'test') === false) {
+            $this->markTestSkipped('Refusing to run without a dedicated MySQL test database (name should include "test").');
+        }
 
         $this->createTestTables();
     }
 
     private function createTestTables(): void
     {
+        Schema::dropIfExists('payments');
+        Schema::dropIfExists('residents');
+        Schema::dropIfExists('users');
+        Schema::dropIfExists('barangays');
+
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('username')->unique();
@@ -126,7 +132,11 @@ class ResidentAndReportFiltersTest extends TestCase
         ]);
 
         $response = $this
-            ->withoutMiddleware()
+            ->withoutMiddleware([
+                \App\Http\Middleware\SessionAuth::class,
+                \App\Http\Middleware\CheckInactivity::class,
+                \App\Http\Middleware\RoleMiddleware::class,
+            ])
             ->withSession([
                 'usr_id' => $officialId,
                 'usr_role' => 'official',
@@ -219,7 +229,11 @@ class ResidentAndReportFiltersTest extends TestCase
         ]);
 
         $response = $this
-            ->withoutMiddleware()
+            ->withoutMiddleware([
+                \App\Http\Middleware\SessionAuth::class,
+                \App\Http\Middleware\CheckInactivity::class,
+                \App\Http\Middleware\RoleMiddleware::class,
+            ])
             ->withSession([
                 'usr_id' => $treasurerId,
                 'usr_role' => 'treasurer',
