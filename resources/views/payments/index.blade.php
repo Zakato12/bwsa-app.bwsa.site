@@ -50,7 +50,6 @@
                 <table class="table table-striped">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>User</th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'amount', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Method</th>
@@ -64,7 +63,6 @@
                     <tbody>
                         @forelse($unpaidRecords as $p)
                             <tr>
-                                <td>{{ $p->id }}</td>
                                 <td>{{ $p->full_name ?? $p->user_name }}</td>
                                 <td>{{ number_format($p->amount, 2) }}</td>
                                 <td>{{ $p->payment_method == 0 ? 'Bill' : ($p->payment_method == 1 ? 'Cash' : 'GCash') }}</td>
@@ -126,7 +124,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center">No unpaid records found.</td>
+                                <td colspan="8" class="text-center">No unpaid records found.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -143,7 +141,6 @@
                 <table class="table table-striped">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>User</th>
                             <th>Bill Name</th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'amount', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
@@ -156,7 +153,6 @@
                     <tbody>
                         @forelse($paidRecords as $p)
                             <tr>
-                                <td>{{ $p->id }}</td>
                                 <td>{{ $p->full_name ?? $p->user_name }}</td>
                                 <td>{{ $p->bill_name ?? '-' }}</td>
                                 <td>{{ number_format($p->amount, 2) }}</td>
@@ -182,7 +178,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center">No paid records found.</td>
+                                <td colspan="7" class="text-center">No paid records found.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -201,7 +197,6 @@
                     <table class="table table-striped">
                         <thead>
                             <tr>
-                                <th>ID</th>
                                 <th>Bill</th>
                                 <th>Base Amount</th>
                                 <th>Amount Due</th>
@@ -214,7 +209,6 @@
                         <tbody>
                             @forelse($bills as $bill)
                             <tr>
-                                <td>{{ $bill->id }}</td>
                                 <td>{{ $bill->bill_name }}</td>
                                 <td>{{ number_format($bill->amount, 2) }}</td>
                                 <td>{{ number_format($bill->amount_due ?? $bill->amount, 2) }}</td>
@@ -239,7 +233,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="8" class="text-center">No bills found.</td>
+                                <td colspan="7" class="text-center">No bills found.</td>
                             </tr>
                             @endforelse
                         </tbody>
@@ -255,7 +249,6 @@
                     <table class="table table-striped">
                         <thead>
                             <tr>
-                                <th>ID</th>
                                 <th>Amount</th>
                                 <th>Method</th>
                                 <th>Status</th>
@@ -265,7 +258,6 @@
                         <tbody>
                             @forelse($payments as $p)
                             <tr>
-                                <td>{{ $p->id }}</td>
                                 <td>{{ number_format($p->amount, 2) }}</td>
                                 <td>{{ $p->payment_method == 1 ? 'Cash' : 'GCash' }}</td>
                                 <td>
@@ -283,7 +275,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="5" class="text-center">No payments found.</td>
+                                <td colspan="4" class="text-center">No payments found.</td>
                             </tr>
                             @endforelse
                         </tbody>
