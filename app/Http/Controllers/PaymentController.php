@@ -128,7 +128,32 @@ class PaymentController extends Controller
 
                 $isOverdue = now()->toDateString() > (string) $bill->due_date;
                 $amountDue = $isOverdue ? ((float) $bill->amount * 2) : (float) $bill->amount;
-                $amountToCheck = $amountDue;
+                $amountToCheck = (float) $request->amount;
+                if ($amountToCheck < $amountDue) {
+                    return ['state' => 'insufficient_amount'];
+                }
+
+                $isRecurringMonthly = (int) $bill->is_recurring === 1 && $bill->recurrence_type === 'monthly';
+                if (!$isRecurringMonthly && $amountToCheck > $amountDue) {
+                    return ['state' => 'advance_not_supported'];
+                }
+
+                $advanceMonths = 0;
+                $creditAmount = 0.00;
+                $appliedThroughDueDate = null;
+                if ($isRecurringMonthly && $amountToCheck > $amountDue) {
+                    $baseAmount = (float) $bill->amount;
+                    if ($baseAmount > 0) {
+                        $extraAmount = $amountToCheck - $amountDue;
+                        $advanceMonths = (int) floor($extraAmount / $baseAmount);
+                        $creditAmount = round($extraAmount - ($advanceMonths * $baseAmount), 2);
+                        if ($advanceMonths > 0) {
+                            $appliedThroughDueDate = Carbon::parse($bill->due_date)
+                                ->addMonthsNoOverflow($advanceMonths)
+                                ->toDateString();
+                        }
+                    }
+                }
 
                 $recentDuplicate = DB::table('payments')
                     ->where('user_id', $userId)
@@ -144,9 +169,12 @@ class PaymentController extends Controller
 
                 $paymentId = DB::table('payments')->insertGetId([
                     'user_id' => $userId,
-                    'amount' => $amountDue,
+                    'amount' => $amountToCheck,
                     'payment_method' => $request->payment_method,
                     'status' => 1,
+                    'advance_months' => $advanceMonths,
+                    'credit_amount' => $creditAmount,
+                    'applied_through_due_date' => $appliedThroughDueDate,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -157,10 +185,35 @@ class PaymentController extends Controller
                     'updated_at' => now(),
                 ]);
 
-                if ((int) $bill->is_recurring === 1 && $bill->recurrence_type === 'monthly') {
-                    $nextDueDate = Carbon::parse($bill->due_date)->addMonthNoOverflow()->toDateString();
-                    $nextBillName = $this->monthlyBillNameForDate($nextDueDate);
+                if ($isRecurringMonthly) {
+                    for ($i = 1; $i <= $advanceMonths; $i++) {
+                        $advanceDueDate = Carbon::parse($bill->due_date)->addMonthsNoOverflow($i)->toDateString();
+                        $advanceBillName = $this->monthlyBillNameForDate($advanceDueDate);
 
+                        $existingAdvanceBill = DB::table('bills')
+                            ->where('user_id', $userId)
+                            ->where('bill_name', $advanceBillName)
+                            ->whereDate('due_date', $advanceDueDate)
+                            ->exists();
+
+                        if (!$existingAdvanceBill) {
+                            DB::table('bills')->insert([
+                                'user_id' => $userId,
+                                'bill_name' => $advanceBillName,
+                                'amount' => $bill->amount,
+                                'due_date' => $advanceDueDate,
+                                'status' => 'paid',
+                                'paid_at' => now(),
+                                'is_recurring' => 1,
+                                'recurrence_type' => $bill->recurrence_type,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                        }
+                    }
+
+                    $nextDueDate = Carbon::parse($bill->due_date)->addMonthsNoOverflow($advanceMonths + 1)->toDateString();
+                    $nextBillName = $this->monthlyBillNameForDate($nextDueDate);
                     $existingNextBill = DB::table('bills')
                         ->where('user_id', $userId)
                         ->where('bill_name', $nextBillName)
@@ -190,6 +243,12 @@ class PaymentController extends Controller
             if (($result['state'] ?? null) === 'bill_unavailable') {
                 return redirect()->route('payments.index')->with('error', 'This bill is already paid or unavailable.');
             }
+            if (($result['state'] ?? null) === 'insufficient_amount') {
+                return redirect()->back()->with('error', 'Amount must be at least the current amount due.');
+            }
+            if (($result['state'] ?? null) === 'advance_not_supported') {
+                return redirect()->back()->with('error', 'Advance payment is only supported for recurring monthly bills.');
+            }
             if (($result['state'] ?? null) === 'duplicate') {
                 return redirect()->route('payments.index')->with('success', 'Payment already submitted. Please wait for verification.');
             }
@@ -214,6 +273,9 @@ class PaymentController extends Controller
                 'amount' => $request->amount,
                 'payment_method' => $request->payment_method,
                 'status' => 1,
+                'advance_months' => 0,
+                'credit_amount' => 0.00,
+                'applied_through_due_date' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

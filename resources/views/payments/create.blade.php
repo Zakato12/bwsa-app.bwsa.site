@@ -33,9 +33,22 @@
                         @endif
                         <div class="mb-3">
                             <label for="amount" class="form-label">Amount</label>
-                            <input type="number" step="0.01" class="form-control" name="amount" value="{{ $bill ? ($bill->amount_due ?? $bill->amount) : '' }}" required {{ $bill ? 'readonly' : '' }}>
+                            <input
+                                type="number"
+                                step="0.01"
+                                class="form-control"
+                                name="amount"
+                                value="{{ $bill ? ($bill->amount_due ?? $bill->amount) : '' }}"
+                                min="{{ $bill ? ($bill->amount_due ?? $bill->amount) : '0.01' }}"
+                                required
+                            >
                             @if($bill && ($bill->amount_due ?? $bill->amount) > $bill->amount)
                                 <small class="text-danger">Overdue penalty applied (2x of base amount).</small>
+                            @endif
+                            @if($bill)
+                                <small class="text-muted d-block mt-1">
+                                    You may enter a higher amount to advance future monthly bills.
+                                </small>
                             @endif
                         </div>
                         <input type="hidden" name="payment_method" value="2">
