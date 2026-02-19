@@ -52,7 +52,7 @@
                         <tr>
                             <th>User</th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'amount', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Amount {{ $sortBy == 'amount' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
-                            <th>Method</th>
+                            <th>Bill Name</th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'status', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'due_date', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Due Date {{ $sortBy == 'due_date' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Receipt</th>
@@ -65,7 +65,7 @@
                             <tr>
                                 <td>{{ $p->full_name ?? $p->user_name }}</td>
                                 <td>{{ number_format($p->amount, 2) }}</td>
-                                <td>{{ $p->payment_method == 0 ? 'Bill' : ($p->payment_method == 1 ? 'Cash' : 'GCash') }}</td>
+                                <td>{{ $p->bill_name ?? '-' }}</td>
                                 <td>
                                     @if($p->status == -1)
                                         <span class="badge bg-danger">Overdue Bill</span>

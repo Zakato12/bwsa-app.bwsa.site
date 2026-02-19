@@ -320,6 +320,7 @@ class PaymentController extends Controller
                     DB::raw('NULL as verified_at'),
                     'users.username as user_name',
                     'users.full_name as full_name',
+                    'bills.bill_name as bill_name',
                     DB::raw("'bill' as row_type")
                 )
                 ->whereIn('bills.status', ['pending', 'overdue']);
@@ -365,6 +366,7 @@ class PaymentController extends Controller
                     'gcash_payments.verified_at',
                     'users.username as user_name',
                     'users.full_name as full_name',
+                    DB::raw("(SELECT b.bill_name FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60 ORDER BY ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) ASC, b.id DESC LIMIT 1) as bill_name"),
                     DB::raw("'payment' as row_type")
                 )
                 ->whereIn('payments.status', [1, 2]);
