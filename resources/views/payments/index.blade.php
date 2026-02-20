@@ -188,6 +188,48 @@
                 {{ $paidRecords->links() }}
             </div>
         </div>
+
+        @if(in_array(session('usr_role'), ['official', 'treasurer']))
+            <div class="mb-4">
+                <h3>Cutoff List (3+ Unpaid Bills)</h3>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Resident</th>
+                                <th>Username</th>
+                                <th>Total Unpaid</th>
+                                <th>Overdue</th>
+                                <th>Pending</th>
+                                <th>Oldest Due Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse(($cutoffResidents ?? collect()) as $resident)
+                                <tr>
+                                    <td>{{ $resident->full_name }}</td>
+                                    <td>{{ $resident->username }}</td>
+                                    <td>{{ $resident->unpaid_total }}</td>
+                                    <td>{{ $resident->overdue_count }}</td>
+                                    <td>{{ $resident->pending_count }}</td>
+                                    <td>
+                                        @if(!empty($resident->oldest_due_date))
+                                            {{ \Carbon\Carbon::parse($resident->oldest_due_date)->format('M d, Y') }}
+                                        @else
+                                            -
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="text-center">No residents currently flagged for cutoff.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
     @else
         <!-- Resident View: Bills and Payment History -->
         <div class="row">

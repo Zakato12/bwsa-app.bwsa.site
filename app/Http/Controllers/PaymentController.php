@@ -516,7 +516,42 @@ class PaymentController extends Controller
                 ->filter()
                 ->values();
 
-            return view('payments.index', compact('unpaidRecords', 'paidRecords', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions'));
+            $cutoffResidents = collect();
+            $canViewCutoffList = in_array(session('usr_role'), ['official', 'treasurer'], true);
+            if ($canViewCutoffList) {
+                $cutoffResidentsQuery = DB::table('bills')
+                    ->join('users', 'bills.user_id', '=', 'users.id')
+                    ->select(
+                        'bills.user_id',
+                        'users.full_name',
+                        'users.username',
+                        DB::raw("SUM(CASE WHEN bills.status = 'overdue' THEN 1 ELSE 0 END) as overdue_count"),
+                        DB::raw("SUM(CASE WHEN bills.status = 'pending' THEN 1 ELSE 0 END) as pending_count"),
+                        DB::raw('COUNT(*) as unpaid_total'),
+                        DB::raw('MIN(bills.due_date) as oldest_due_date')
+                    )
+                    ->whereIn('bills.status', ['pending', 'overdue'])
+                    ->groupBy('bills.user_id', 'users.full_name', 'users.username')
+                    ->havingRaw('COUNT(*) >= 3')
+                    ->orderBy('unpaid_total', 'desc')
+                    ->orderBy('oldest_due_date', 'asc');
+
+                if ($isScopedToBarangay) {
+                    $cutoffResidentsQuery->join('residents', 'residents.user_id', '=', 'bills.user_id')
+                        ->where('residents.barangay_id', $barangayId);
+                }
+
+                if ($search !== '') {
+                    $cutoffResidentsQuery->where(function ($q) use ($search) {
+                        $q->where('users.username', 'like', '%' . $search . '%')
+                            ->orWhere('users.full_name', 'like', '%' . $search . '%');
+                    });
+                }
+
+                $cutoffResidents = $cutoffResidentsQuery->get();
+            }
+
+            return view('payments.index', compact('unpaidRecords', 'paidRecords', 'cutoffResidents', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions'));
         } else {
             DB::table('bills')
                 ->where('user_id', session('usr_id'))
