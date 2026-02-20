@@ -772,6 +772,7 @@ class PaymentController extends Controller
 
         $request->validate([
             'user_id' => 'required|exists:users,id',
+            'amount' => 'required|numeric|min:0.01',
         ]);
 
         if ($redirect = $this->requireRoleInBarangay(['treasurer'], (int) $request->user_id, (int) $barangayId)) {
@@ -794,25 +795,56 @@ class PaymentController extends Controller
             ->orderBy('id')
             ->first();
 
-        $amountToPay = (float) DB::table('barangays')
+        $amountDue = (float) DB::table('barangays')
             ->where('id', $barangayId)
             ->value('payment_amount_per_bill');
-        if ($amountToPay <= 0) {
-            $amountToPay = 50.0;
+        if ($amountDue <= 0) {
+            $amountDue = 50.0;
         }
 
         if ($unpaidBill) {
-            $amountToPay = (float) $unpaidBill->amount;
+            $amountDue = (float) $unpaidBill->amount;
             if ((string) $unpaidBill->due_date < now()->toDateString()) {
-                $amountToPay = $amountToPay * 2;
+                $amountDue = $amountDue * 2;
+            }
+        }
+
+        $submittedAmount = (float) $request->amount;
+        if ($submittedAmount < $amountDue) {
+            return redirect()->back()->with('error', 'Amount must be at least the current amount due.');
+        }
+
+        $advanceMonths = 0;
+        $creditAmount = 0.00;
+        $appliedThroughDueDate = null;
+        $isRecurringMonthly = $unpaidBill && (int) $unpaidBill->is_recurring === 1 && $unpaidBill->recurrence_type === 'monthly';
+
+        if ($submittedAmount > $amountDue) {
+            if (!$isRecurringMonthly) {
+                return redirect()->back()->with('error', 'Advance payment is only supported for recurring monthly bills.');
+            }
+
+            $baseAmount = (float) $unpaidBill->amount;
+            if ($baseAmount > 0) {
+                $extraAmount = $submittedAmount - $amountDue;
+                $advanceMonths = (int) floor($extraAmount / $baseAmount);
+                $creditAmount = round($extraAmount - ($advanceMonths * $baseAmount), 2);
+                if ($advanceMonths > 0) {
+                    $appliedThroughDueDate = Carbon::parse($unpaidBill->due_date)
+                        ->addMonthsNoOverflow($advanceMonths)
+                        ->toDateString();
+                }
             }
         }
 
         $paymentId = DB::table('payments')->insertGetId([
             'user_id' => $request->user_id,
-            'amount' => $amountToPay,
+            'amount' => $submittedAmount,
             'payment_method' => 1, // cash
             'status' => 3, // approved
+            'advance_months' => $advanceMonths,
+            'credit_amount' => $creditAmount,
+            'applied_through_due_date' => $appliedThroughDueDate,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -824,8 +856,34 @@ class PaymentController extends Controller
                 'updated_at' => now(),
             ]);
 
-            if ((int) $unpaidBill->is_recurring === 1 && $unpaidBill->recurrence_type === 'monthly') {
-                $nextDueDate = Carbon::parse($unpaidBill->due_date)->addMonthNoOverflow()->toDateString();
+            if ($isRecurringMonthly) {
+                for ($i = 1; $i <= $advanceMonths; $i++) {
+                    $advanceDueDate = Carbon::parse($unpaidBill->due_date)->addMonthsNoOverflow($i)->toDateString();
+                    $advanceBillName = $this->monthlyBillNameForDate($advanceDueDate);
+
+                    $existingAdvanceBill = DB::table('bills')
+                        ->where('user_id', (int) $request->user_id)
+                        ->where('bill_name', $advanceBillName)
+                        ->whereDate('due_date', $advanceDueDate)
+                        ->exists();
+
+                    if (!$existingAdvanceBill) {
+                        DB::table('bills')->insert([
+                            'user_id' => (int) $request->user_id,
+                            'bill_name' => $advanceBillName,
+                            'amount' => $unpaidBill->amount,
+                            'due_date' => $advanceDueDate,
+                            'status' => 'paid',
+                            'paid_at' => now(),
+                            'is_recurring' => 1,
+                            'recurrence_type' => 'monthly',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
+                $nextDueDate = Carbon::parse($unpaidBill->due_date)->addMonthsNoOverflow($advanceMonths + 1)->toDateString();
                 $nextBillName = $this->monthlyBillNameForDate($nextDueDate);
 
                 $existsNext = DB::table('bills')
