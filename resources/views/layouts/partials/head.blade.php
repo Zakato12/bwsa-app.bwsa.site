@@ -6,7 +6,7 @@
 <link rel="icon" type="image/png" href="{{ asset('assets/apple-touch-icon.png') }}">
 
 <!-- Bootstrap CSS -->
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ asset('vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
 
 <!-- Custom CSS -->
 <link rel="stylesheet" href="{{ asset('css/style.css') }}">

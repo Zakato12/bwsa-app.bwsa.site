@@ -1,4 +1,3 @@
-@include('layouts.partials.head')
 @php
     $displayBarangay = session('usr_barangay');
 
@@ -20,7 +19,7 @@
     <div class="container-fluid">
         <!-- Toggle button -->
         <button class="btn btn-dark shadow-none text-white me-3 d-lg-none" id="sidebarToggle">
-            ☰
+            &#9776;
         </button>
 
         <!-- Dynamic Page Title -->
@@ -65,3 +64,4 @@
         </div>
     </div>
 </nav>
+
