@@ -29,14 +29,39 @@ def extract_amount(text):
 
 
 def extract_reference(text):
+    month_pattern = r"(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|SEPT|OCT|NOV|DEC)"
+    marker_pattern = r"(?:Ref(?:erence)?(?:\s*[\.:])?\s*(?:No\.?|Number)?|Transaction\s*(?:ID|No\.?))"
+    marker = re.search(marker_pattern, text, re.IGNORECASE)
+    if marker:
+        # Include following chars so wrapped reference digits on the next line are considered.
+        tail = text[marker.end(): marker.end() + 180]
+        raw = tail.upper()
+        raw = re.sub(rf"\b{month_pattern}\b\s+\d{{1,2}},?\s+\d{{4}}", " ", raw)
+        raw = re.sub(r"\b\d{1,2}:\d{2}\b", " ", raw)
+        raw = re.sub(r"\bAM\b|\bPM\b", " ", raw)
+        raw = re.sub(r"[^A-Z0-9\s\-]", " ", raw)
+
+        digit_groups = re.findall(r"\d{3,}", raw)
+        if digit_groups:
+            if len(digit_groups[0]) >= 10:
+                return digit_groups[0]
+
+            candidate = "".join(digit_groups[:3])
+            if 6 <= len(candidate) <= 16:
+                return candidate
+
     patterns = [
-        r"(?:Ref(?:erence)?\s*(?:No\.?|Number)?\s*[:\-]?\s*)([A-Z0-9\-]{6,})",
+        r"(?:Ref(?:erence)?(?:\s*[\.:])?\s*(?:No\.?|Number)?\s*[:\-]?\s*)([A-Z0-9][A-Z0-9\-\s]{5,})",
         r"(?:Transaction\s*(?:ID|No\.?)\s*[:\-]?\s*)([A-Z0-9\-]{6,})",
     ]
     for pattern in patterns:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
-            return match.group(1)
+            raw = match.group(1).upper().strip()
+            raw = re.split(rf"\b{month_pattern}\b|\b\d{{1,2}}:\d{{2}}\b|\bAM\b|\bPM\b", raw, maxsplit=1)[0]
+            candidate = re.sub(r"[^A-Z0-9\-]", "", raw)
+            if len(candidate) >= 6:
+                return candidate
     return None
 
 
