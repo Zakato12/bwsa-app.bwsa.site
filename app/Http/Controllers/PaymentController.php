@@ -644,6 +644,36 @@ class PaymentController extends Controller
             return $redirect;
         }
 
+        if ((int) $payment->payment_method !== 2) {
+            return redirect()->back()->with('error', 'Only GCash payments require OCR verification.');
+        }
+
+        $gcash = DB::table('gcash_payments')
+            ->where('payment_id', $id)
+            ->first();
+        if (!$gcash || empty($gcash->receipt_image_path)) {
+            return redirect()->back()->with('error', 'Receipt data not found for OCR verification.');
+        }
+
+        $ocrText = trim((string) ($gcash->ocr_text ?? ''));
+        if ($ocrText === '' || stripos($ocrText, 'OCR pending') !== false) {
+            return redirect()->back()->with('error', 'OCR still pending. Reprocess OCR and try again.');
+        }
+        if (stripos($ocrText, 'OCR failed') !== false) {
+            return redirect()->back()->with('error', 'OCR failed. Reprocess OCR or review receipt manually first.');
+        }
+
+        if ($gcash->extracted_amount !== null) {
+            $expected = (float) $payment->amount;
+            $extracted = (float) $gcash->extracted_amount;
+            if (abs($expected - $extracted) > 0.009) {
+                return redirect()->back()->with(
+                    'error',
+                    'OCR amount mismatch (expected ' . number_format($expected, 2) . ', extracted ' . number_format($extracted, 2) . ').'
+                );
+            }
+        }
+
         DB::table('payments')->where('id', $id)->update(['status' => 2, 'updated_at' => now()]);
         DB::table('gcash_payments')->where('payment_id', $id)->update(['verified_at' => now(), 'updated_at' => now()]);
         Log::info('payments.verified', [
@@ -654,6 +684,47 @@ class PaymentController extends Controller
             'payment_id' => $id,
         ]);
         return redirect()->back()->with('success', 'Payment verified.');
+    }
+
+    public function reprocessOcr($id)
+    {
+        if ($redirect = $this->requireRole(['treasurer'])) {
+            return $redirect;
+        }
+
+        $payment = DB::table('payments')->where('id', $id)->first();
+        if (!$payment) {
+            return redirect()->back()->with('error', 'Payment not found.');
+        }
+
+        if ($redirect = $this->requireRoleInBarangay(['treasurer'], (int) $payment->user_id)) {
+            return $redirect;
+        }
+
+        if ((int) $payment->payment_method !== 2) {
+            return redirect()->back()->with('error', 'OCR reprocess is only available for GCash payments.');
+        }
+
+        $gcash = DB::table('gcash_payments')->where('payment_id', $id)->first();
+        if (!$gcash || empty($gcash->receipt_image_path)) {
+            return redirect()->back()->with('error', 'Receipt not found for OCR reprocess.');
+        }
+
+        DB::table('gcash_payments')
+            ->where('payment_id', $id)
+            ->update([
+                'ocr_text' => 'OCR pending. Manual verification may be required.',
+                'updated_at' => now(),
+            ]);
+
+        $mode = strtolower((string) env('OCR_PROCESSING_MODE', 'sync'));
+        if ($mode === 'queue') {
+            ProcessReceiptOcr::dispatch((int) $id, (string) $gcash->receipt_image_path);
+        } else {
+            ProcessReceiptOcr::dispatchSync((int) $id, (string) $gcash->receipt_image_path);
+        }
+
+        return redirect()->back()->with('success', 'OCR reprocess started.');
     }
 
     public function approve($id)

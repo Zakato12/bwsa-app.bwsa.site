@@ -55,6 +55,7 @@
                             <th>Bill Name</th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'status', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Status {{ $sortBy == 'status' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'due_date', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Due Date {{ $sortBy == 'due_date' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
+                            <th>OCR</th>
                             <th>Receipt</th>
                             <th><a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => $sortOrder == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark">Date {{ $sortBy == 'created_at' ? ($sortOrder == 'asc' ? '^' : 'v') : '' }}</a></th>
                             <th>Actions</th>
@@ -87,6 +88,30 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @if(($p->row_type ?? 'payment') === 'payment' && (int) ($p->payment_method ?? 0) === 2)
+                                        @php
+                                            $ocrText = trim((string) ($p->ocr_text ?? ''));
+                                            $ocrPending = $ocrText === '' || stripos($ocrText, 'OCR pending') !== false;
+                                            $ocrFailed = stripos($ocrText, 'OCR failed') !== false;
+                                        @endphp
+                                        @if($ocrFailed)
+                                            <span class="badge bg-danger">Failed</span>
+                                        @elseif($ocrPending)
+                                            <span class="badge bg-warning text-dark">Pending</span>
+                                        @else
+                                            <span class="badge bg-success">Ready</span>
+                                        @endif
+                                        <div class="small text-muted mt-1">
+                                            Amt: {{ $p->extracted_amount !== null ? number_format((float) $p->extracted_amount, 2) : '-' }}
+                                        </div>
+                                        <div class="small text-muted">
+                                            Ref: {{ $p->extracted_reference ?? '-' }}
+                                        </div>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                                <td>
                                     @if($p->receipt_image_path)
                                         <button
                                             type="button"
@@ -106,6 +131,10 @@
                                 <td>
                                     @if(session('usr_role') == 'treasurer')
                                         @if(($p->row_type ?? 'payment') === 'payment' && $p->status == 1 && $p->payment_method == 2)
+                                            <form action="{{ route('payments.ocr.reprocess', $p->id) }}" method="POST" style="display:inline;">
+                                                @csrf
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm">Reprocess OCR</button>
+                                            </form>
                                             <form action="{{ route('payments.verify', $p->id) }}" method="POST" style="display:inline;">
                                                 @csrf
                                                 <button type="submit" class="btn btn-success btn-sm">Verify</button>
@@ -124,7 +153,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center">No unpaid records found.</td>
+                                <td colspan="9" class="text-center">No unpaid records found.</td>
                             </tr>
                         @endforelse
                     </tbody>
