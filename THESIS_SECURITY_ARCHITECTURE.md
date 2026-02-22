@@ -42,8 +42,8 @@ The application is a Laravel-based web system with roles (e.g., admin, official,
 ## Current State (Observed From Code)
 - Authentication is performed manually via `AuthController` using direct DB queries and session variables.
 - Middleware is used for session authentication and role gating.
-- File uploads are stored to a private disk for receipts.
-- OCR is executed asynchronously via a queue job invoking a local Python script.
+- File uploads target a private receipt disk by default (`RECEIPT_DISK=private`), with runtime fallback to available disks if misconfigured.
+- OCR is executed via a job that can run in `queue` or `sync` mode (`OCR_PROCESSING_MODE`).
 
 Key files reviewed:
 - `routes/web.php`
@@ -132,7 +132,7 @@ This project adopts a decentralized governance model **within a single deploymen
 **Decentralized Principles (Option A)**
 - **Tenant isolation by barangay**: officials and treasurers can only view or act on records from their barangay.
 - **Local autonomy**: residents only access their own records.
-- **Append‑only audit ledger**: all sensitive actions emit immutable log entries (simulated by append‑only file logs).
+- **Append‑only audit ledger**: key security-sensitive actions emit immutable log entries (simulated by append‑only file logs).
 
 **Implemented Controls (Code‑Level)**
 - Barangay scoping for:
@@ -220,10 +220,10 @@ This project adopts **decentralized RBAC** by scoping roles to barangay boundari
 ## Security Constraints (Enforced)
 - All access is enforced using middleware and session‑based authorization.
 - Each request is validated against both user role and barangay scope.
-- Unauthorized access attempts result in immediate denial (HTTP 403).
+- Unauthorized access attempts are denied by role middleware (`403`) or redirected for session/scope failures.
 
 **Middleware Used**
-- `session.auth`: blocks unauthenticated access (403)
+- `session.auth`: blocks unauthenticated access (redirect to login)
 - `role`: role‑based route gate (403)
 
 ## Dashboard and Workflow Alignment
@@ -256,7 +256,7 @@ Request -> Route Middleware (session.auth, role)
 
 ## Security Controls
 ### Authentication
-- Use Laravel Auth guard with `users` provider.
+- Authentication is implemented through manual session management in `AuthController` (with password hashing and session hardening).
 - Enforce session authentication via middleware for protected routes.
 - Rotate session ID after login and password change.
 - Add login throttling (rate limit) at controller entry points.
@@ -387,10 +387,21 @@ php artisan config:cache
 - Strict file validation (size, MIME, type checking).
 
 ### File Uploads and OCR
-- Store receipts in private storage (`storage/app/private` or private S3 bucket).
+- Store receipts on the configured receipt disk (default private storage; fallback may occur if disk configuration is invalid).
 - Serve files via signed URLs or controller authorization checks.
-- Process OCR asynchronously using a queue worker to prevent blocking or abuse.
+- Process OCR through the job pipeline using configurable execution mode (`queue` or `sync`).
 - Sanitize OCR inputs and limit file size and formats.
+- OCR runtime is externalized and configurable via environment:
+  - `OCR_PYTHON_BINARY`, `OCR_PYTHON_CANDIDATES`
+  - `TESSERACT_CMD`
+  - `OCR_PROCESSING_MODE` (`sync` or `queue`)
+- OCR outputs are persisted in `gcash_payments`:
+  - `ocr_text`, `extracted_amount`, `extracted_reference`, `confidence_score`
+- Treasurer review now includes OCR visibility in the payments table:
+  - OCR status badge (`Pending`, `Failed`, `Ready`)
+  - Extracted amount and extracted reference preview
+- OCR can be manually retriggered by treasurer:
+  - `POST /payments/{id}/ocr/reprocess`
 
 ### Transport Security
 - Enforce TLS 1.2+ and HSTS.
@@ -426,16 +437,22 @@ Route::middleware(['session.auth'])->group(function () {
 ```
 
 ## Data Flow (Payments)
-1. Resident uploads receipt -> validated -> stored in private storage
-2. OCR job queued -> executed by worker -> results stored in DB
-3. Treasurer verifies OCR output -> updates payment status
-4. Treasurer approves final payment -> status updated -> audit log entry
-5. Treasurer records walk‑in payments -> status approved -> audit log entry
+1. Resident uploads receipt -> validated -> stored on configured receipt disk (private by default)
+2. OCR job dispatched -> executed in queue or sync mode -> results stored in DB
+3. Treasurer reviews OCR status, extracted amount, and extracted reference
+4. Treasurer may trigger OCR reprocess for failed/pending extraction
+5. Treasurer verifies only after OCR integrity checks pass:
+   - OCR is not pending/failed
+   - Extracted amount matches submitted payment amount
+6. Treasurer approves payment -> status updated -> audit log entry
+   - Note: current implementation does not strictly require prior verified status before approval
+7. Treasurer records walk-in payments -> status approved -> audit log entry
 
 ## Risks and Mitigations (Selected)
 - **Public receipt exposure:** store privately, serve via signed URLs.
 - **Role bypass:** enforce middleware and policies.
 - **OCR abuse:** queue + rate limits + file size caps.
+- **OCR false positives / bad extraction:** enforce treasurer-side verification gates and allow OCR reprocess before verification.
 - **Session compromise:** secure cookies + SameSite + regenerate ID.
 
 ## Evaluation Plan (Thesis)
@@ -472,6 +489,7 @@ requireRoleInBarangay(roles, targetUserId = null, targetBarangayId = null)
 - `PaymentController::store` allows `resident`
 - `PaymentController::index` allows `admin`, `official`, `treasurer`, `resident`
 - `PaymentController::verify` allows `treasurer`
+- `PaymentController::reprocessOcr` allows `treasurer`
 - `PaymentController::approve` allows `treasurer`
 - `PaymentController::createBill` allows `treasurer`
 - `PaymentController::storeBill` allows `treasurer`
@@ -485,4 +503,5 @@ requireRoleInBarangay(roles, targetUserId = null, targetBarangayId = null)
 - `app/Http/Controllers/PaymentController.php` for private storage and queue
 - `config/filesystems.php` for private disk
 - `app/Jobs/ProcessReceiptOcr.php` for OCR async processing
+- `resources/views/payments/index.blade.php` for OCR status visibility and reprocess action
 - `app/Support/Access.php` (or similar) for shared role checks

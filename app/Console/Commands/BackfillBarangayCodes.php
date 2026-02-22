@@ -48,7 +48,21 @@ class BackfillBarangayCodes extends Command
 
     private function generateBarangayCode(string $name, ?int $excludeId = null): string
     {
-        $normalized = strtoupper((string) preg_replace('/[^A-Za-z]/', '', $name));
+        $parts = preg_split('/[^A-Za-z]+/', strtoupper($name)) ?: [];
+        $stopwords = ['BARANGAY', 'BRGY', 'BRGY.', 'BGY', 'BARANGGAY'];
+        $filteredParts = array_values(array_filter($parts, function ($part) use ($stopwords) {
+            return $part !== '' && !in_array($part, $stopwords, true);
+        }));
+
+        if (empty($filteredParts)) {
+            $filteredParts = array_values(array_filter($parts, fn ($part) => $part !== ''));
+        }
+
+        $normalized = implode('', $filteredParts);
+        if ($normalized === '') {
+            $normalized = 'BRGY';
+        }
+
         $consonants = preg_replace('/[AEIOU]/', '', $normalized);
         $base = Str::substr((string) $consonants, 0, 4);
 
