@@ -663,6 +663,10 @@ class PaymentController extends Controller
             return redirect()->back()->with('error', 'OCR failed. Reprocess OCR or review receipt manually first.');
         }
 
+        if ($gcash->extracted_amount === null) {
+            return redirect()->back()->with('error', 'OCR did not extract amount from receipt. Reprocess OCR or review manually.');
+        }
+
         if ($gcash->extracted_amount !== null) {
             $expected = (float) $payment->amount;
             $extracted = (float) $gcash->extracted_amount;
@@ -740,6 +744,10 @@ class PaymentController extends Controller
 
         if ($redirect = $this->requireRoleInBarangay(['treasurer'], (int) $payment->user_id)) {
             return $redirect;
+        }
+
+        if ((int) $payment->status !== 2) {
+            return redirect()->back()->with('error', 'Payment must be verified before approval.');
         }
 
         DB::table('payments')->where('id', $id)->update(['status' => 3, 'updated_at' => now()]);
