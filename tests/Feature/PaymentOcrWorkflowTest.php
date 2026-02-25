@@ -82,6 +82,9 @@ class PaymentOcrWorkflowTest extends TestCase
             $table->decimal('confidence_score', 5, 2)->nullable();
             $table->string('receipt_image_path')->nullable();
             $table->timestamp('verified_at')->nullable();
+            $table->string('rejection_reason')->nullable();
+            $table->timestamp('rejected_at')->nullable();
+            $table->unsignedBigInteger('rejected_by')->nullable();
             $table->timestamps();
         });
     }
@@ -300,5 +303,86 @@ class PaymentOcrWorkflowTest extends TestCase
         $response->assertRedirect(route('dashboard'));
         $response->assertSessionHas('error', 'Unauthorized');
     }
-}
 
+    public function test_reject_requires_reason(): void
+    {
+        [$treasurerId, $residentUserId] = $this->seedActors(true);
+
+        $paymentId = DB::table('payments')->insertGetId([
+            'user_id' => $residentUserId,
+            'amount' => 100.00,
+            'payment_method' => 2,
+            'status' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('gcash_payments')->insert([
+            'payment_id' => $paymentId,
+            'receipt_image_path' => 'receipts/sample.jpg',
+            'ocr_text' => 'OCR completed',
+            'extracted_amount' => 100.00,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this
+            ->withoutMiddleware([\App\Http\Middleware\CheckInactivity::class])
+            ->withSession([
+                'usr_id' => $treasurerId,
+                'usr_role' => 'treasurer',
+            ])
+            ->post(route('payments.reject', $paymentId), [
+                'rejection_reason' => '',
+            ]);
+
+        $response->assertSessionHasErrors('rejection_reason');
+    }
+
+    public function test_reject_updates_payment_and_gcash_tables(): void
+    {
+        [$treasurerId, $residentUserId] = $this->seedActors(true);
+
+        $paymentId = DB::table('payments')->insertGetId([
+            'user_id' => $residentUserId,
+            'amount' => 100.00,
+            'payment_method' => 2,
+            'status' => 2,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('gcash_payments')->insert([
+            'payment_id' => $paymentId,
+            'receipt_image_path' => 'receipts/sample.jpg',
+            'ocr_text' => 'OCR completed',
+            'extracted_amount' => 100.00,
+            'verified_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this
+            ->withoutMiddleware([\App\Http\Middleware\CheckInactivity::class])
+            ->withSession([
+                'usr_id' => $treasurerId,
+                'usr_role' => 'treasurer',
+            ])
+            ->post(route('payments.reject', $paymentId), [
+                'rejection_reason' => 'Receipt details do not match expected payer.',
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', 'Payment rejected.');
+
+        $this->assertDatabaseHas('payments', [
+            'id' => $paymentId,
+            'status' => 4,
+        ]);
+        $this->assertDatabaseHas('gcash_payments', [
+            'payment_id' => $paymentId,
+            'rejection_reason' => 'Receipt details do not match expected payer.',
+            'rejected_by' => $treasurerId,
+        ]);
+    }
+}

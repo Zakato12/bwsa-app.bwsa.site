@@ -42,6 +42,7 @@ Route::middleware(['session.auth', 'session.timeout'])->group(function () {
     Route::get('/payments', [App\Http\Controllers\PaymentController::class, 'index'])->name('payments.index');
     Route::post('/payments/{id}/verify', [App\Http\Controllers\PaymentController::class, 'verify'])->name('payments.verify')->middleware('role:treasurer');
     Route::post('/payments/{id}/ocr/reprocess', [App\Http\Controllers\PaymentController::class, 'reprocessOcr'])->name('payments.ocr.reprocess')->middleware(['role:treasurer', 'throttle:20,1']);
+    Route::post('/payments/{id}/reject', [App\Http\Controllers\PaymentController::class, 'reject'])->name('payments.reject')->middleware(['role:treasurer', 'throttle:20,1']);
     Route::post('/payments/{id}/approve', [App\Http\Controllers\PaymentController::class, 'approve'])->name('payments.approve')->middleware('role:treasurer');
     Route::get('/payments/{id}/receipt', [App\Http\Controllers\PaymentController::class, 'receipt'])->name('payments.receipt');
     Route::get('/payments/bill/create', [App\Http\Controllers\PaymentController::class, 'createBill'])->name('payments.createBill')->middleware('role:treasurer');

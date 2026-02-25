@@ -44,6 +44,16 @@
     </form>
 
     @if(in_array(session('usr_role'), ['admin', 'official', 'treasurer']))
+        <div class="mb-3 d-flex flex-wrap gap-2">
+            <a href="{{ route('payments.index', array_merge(request()->except(['unpaid_page','paid_page','rejected_page','cutoff_page']), ['list' => 'unpaid'])) }}" class="btn {{ ($activeList ?? 'unpaid') === 'unpaid' ? 'btn-primary' : 'btn-outline-primary' }}">Unpaid</a>
+            <a href="{{ route('payments.index', array_merge(request()->except(['unpaid_page','paid_page','rejected_page','cutoff_page']), ['list' => 'paid'])) }}" class="btn {{ ($activeList ?? 'unpaid') === 'paid' ? 'btn-primary' : 'btn-outline-primary' }}">Paid</a>
+            <a href="{{ route('payments.index', array_merge(request()->except(['unpaid_page','paid_page','rejected_page','cutoff_page']), ['list' => 'rejected'])) }}" class="btn {{ ($activeList ?? 'unpaid') === 'rejected' ? 'btn-primary' : 'btn-outline-primary' }}">Rejected</a>
+            @if(in_array(session('usr_role'), ['official', 'treasurer']))
+                <a href="{{ route('payments.index', array_merge(request()->except(['unpaid_page','paid_page','rejected_page','cutoff_page']), ['list' => 'cutoff'])) }}" class="btn {{ ($activeList ?? 'unpaid') === 'cutoff' ? 'btn-primary' : 'btn-outline-primary' }}">Cutoff</a>
+            @endif
+        </div>
+
+        @if(($activeList ?? 'unpaid') === 'unpaid')
         <div class="mb-4">
             <h3>Unpaid List</h3>
             <div class="table-responsive">
@@ -135,12 +145,22 @@
                                                 @csrf
                                                 <button type="submit" class="btn btn-outline-secondary btn-sm">Reprocess OCR</button>
                                             </form>
+                                            <form action="{{ route('payments.reject', $p->id) }}" method="POST" style="display:inline;" class="js-reject-form">
+                                                @csrf
+                                                <input type="hidden" name="rejection_reason" value="">
+                                                <button type="button" class="btn btn-danger btn-sm js-reject-btn">Reject</button>
+                                            </form>
                                             <form action="{{ route('payments.verify', $p->id) }}" method="POST" style="display:inline;">
                                                 @csrf
                                                 <button type="submit" class="btn btn-success btn-sm">Verify</button>
                                             </form>
                                         @endif
                                         @if(($p->row_type ?? 'payment') === 'payment' && $p->status == 2)
+                                            <form action="{{ route('payments.reject', $p->id) }}" method="POST" style="display:inline;" class="js-reject-form">
+                                                @csrf
+                                                <input type="hidden" name="rejection_reason" value="">
+                                                <button type="button" class="btn btn-danger btn-sm js-reject-btn">Reject</button>
+                                            </form>
                                             <form action="{{ route('payments.approve', $p->id) }}" method="POST" style="display:inline;">
                                                 @csrf
                                                 <button type="submit" class="btn btn-primary btn-sm">Approve</button>
@@ -163,7 +183,9 @@
                 {{ $unpaidRecords->links() }}
             </div>
         </div>
+        @endif
 
+        @if(($activeList ?? 'unpaid') === 'paid')
         <div class="mb-4">
             <h3>Paid List</h3>
             <div class="table-responsive">
@@ -217,8 +239,71 @@
                 {{ $paidRecords->links() }}
             </div>
         </div>
+        @endif
 
-        @if(in_array(session('usr_role'), ['official', 'treasurer']))
+        @if(($activeList ?? 'unpaid') === 'rejected')
+        <div class="mb-4">
+            <h3>Rejected Payments</h3>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Bill Name</th>
+                            <th>Amount</th>
+                            <th>Method</th>
+                            <th>Status</th>
+                            <th>Reason</th>
+                            <th>Rejected At</th>
+                            <th>Rejected By</th>
+                            <th>Receipt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse(($rejectedRecords ?? collect()) as $p)
+                            <tr>
+                                <td>{{ $p->full_name ?? $p->user_name }}</td>
+                                <td>{{ $p->bill_name ?? '-' }}</td>
+                                <td>{{ number_format($p->amount, 2) }}</td>
+                                <td>{{ $p->payment_method == 1 ? 'Cash' : 'GCash' }}</td>
+                                <td><span class="badge bg-danger">Rejected</span></td>
+                                <td>{{ $p->rejection_reason ?? '-' }}</td>
+                                <td>{{ !empty($p->rejected_at) ? \Carbon\Carbon::parse($p->rejected_at)->format('M d, Y h:i A') : '-' }}</td>
+                                <td>{{ $p->rejected_by_name ?? '-' }}</td>
+                                <td>
+                                    @if($p->receipt_image_path)
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-secondary btn-sm js-receipt-preview"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#receiptPreviewModal"
+                                            data-receipt-url="{{ route('payments.receipt', $p->id) }}"
+                                            data-download-url="{{ route('payments.receipt', $p->id) }}?download=1"
+                                        >
+                                            View
+                                        </button>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="9" class="text-center">No rejected payments found.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-2">
+                @if(isset($rejectedRecords))
+                    {{ $rejectedRecords->links() }}
+                @endif
+            </div>
+        </div>
+        @endif
+
+        @if(in_array(session('usr_role'), ['official', 'treasurer']) && ($activeList ?? 'unpaid') === 'cutoff')
             <div class="mb-4">
                 <h3>Cutoff List (3+ Unpaid Bills)</h3>
                 <div class="table-responsive">
@@ -257,13 +342,24 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="mt-2">
+                    @if(isset($cutoffResidents))
+                        {{ $cutoffResidents->links() }}
+                    @endif
+                </div>
             </div>
         @endif
     @else
         <!-- Resident View: Bills and Payment History -->
-        <div class="row">
-            <div class="col-md-6">
-                <h3>My Bills</h3>
+        <div class="mb-3 d-flex flex-wrap gap-2">
+            <a href="{{ route('payments.index', array_merge(request()->except(['my_unpaid_bills_page','my_paid_bills_page','my_payments_page']), ['my_list' => 'unpaid_bills'])) }}" class="btn {{ ($activeResidentList ?? 'unpaid_bills') === 'unpaid_bills' ? 'btn-primary' : 'btn-outline-primary' }}">Unpaid Bills</a>
+            <a href="{{ route('payments.index', array_merge(request()->except(['my_unpaid_bills_page','my_paid_bills_page','my_payments_page']), ['my_list' => 'paid_bills'])) }}" class="btn {{ ($activeResidentList ?? 'unpaid_bills') === 'paid_bills' ? 'btn-primary' : 'btn-outline-primary' }}">Paid Bills</a>
+            <a href="{{ route('payments.index', array_merge(request()->except(['my_unpaid_bills_page','my_paid_bills_page','my_payments_page']), ['my_list' => 'payments'])) }}" class="btn {{ ($activeResidentList ?? 'unpaid_bills') === 'payments' ? 'btn-primary' : 'btn-outline-primary' }}">Payment History</a>
+        </div>
+
+        @if(($activeResidentList ?? 'unpaid_bills') === 'unpaid_bills')
+            <div>
+                <h3>Unpaid Bills</h3>
                 @if(($cutoffNoticeActive ?? false) === true)
                     <div class="alert alert-danger">
                         Cut-off notice: You currently have {{ $unpaidBillCount ?? 0 }} unpaid/overdue bills. Please settle your balance to avoid service disconnection.
@@ -283,7 +379,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($bills as $bill)
+                            @forelse($unpaidBills as $bill)
                             <tr>
                                 <td>{{ $bill->bill_name }}</td>
                                 <td>{{ number_format($bill->amount, 2) }}</td>
@@ -316,10 +412,50 @@
                     </table>
                 </div>
                 <div class="mt-2">
-                    {{ $bills->links() }}
+                    {{ $unpaidBills->links() }}
                 </div>
             </div>
-            <div class="col-md-6">
+        @endif
+
+        @if(($activeResidentList ?? 'unpaid_bills') === 'paid_bills')
+            <div>
+                <h3>Paid Bills</h3>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Bill</th>
+                                <th>Amount</th>
+                                <th>Due Date</th>
+                                <th>Paid At</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($paidBills as $bill)
+                            <tr>
+                                <td>{{ $bill->bill_name }}</td>
+                                <td>{{ number_format($bill->amount, 2) }}</td>
+                                <td>{{ \Carbon\Carbon::parse($bill->due_date)->format('M d, Y') }}</td>
+                                <td>{{ !empty($bill->paid_at) ? \Carbon\Carbon::parse($bill->paid_at)->format('M d, Y h:i A') : '-' }}</td>
+                                <td><span class="badge bg-success">Paid</span></td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="5" class="text-center">No paid bills found.</td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-2">
+                    {{ $paidBills->links() }}
+                </div>
+            </div>
+        @endif
+
+        @if(($activeResidentList ?? 'unpaid_bills') === 'payments')
+            <div>
                 <h3>Payment History</h3>
                 <div class="table-responsive">
                     <table class="table table-striped">
@@ -328,6 +464,7 @@
                                 <th>Amount</th>
                                 <th>Method</th>
                                 <th>Status</th>
+                                <th>Reason</th>
                                 <th>Date</th>
                             </tr>
                         </thead>
@@ -344,14 +481,15 @@
                                     @elseif($p->status == 3)
                                         <span class="badge bg-success">Approved</span>
                                     @else
-                                        <span class="badge bg-danger">Failed</span>
+                                        <span class="badge bg-danger">Rejected</span>
                                     @endif
                                 </td>
+                                <td>{{ (int) $p->status === 4 ? ($p->rejection_reason ?? '-') : '-' }}</td>
                                 <td>{{ \Carbon\Carbon::parse($p->created_at)->format('M d, Y') }}</td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="4" class="text-center">No payments found.</td>
+                                <td colspan="5" class="text-center">No payments found.</td>
                             </tr>
                             @endforelse
                         </tbody>
@@ -361,7 +499,7 @@
                     {{ $payments->links() }}
                 </div>
             </div>
-        </div>
+        @endif
     @endif
 </div>
 
@@ -408,6 +546,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
     modal.addEventListener('hidden.bs.modal', function () {
         previewImage.src = '';
+    });
+
+    document.querySelectorAll('.js-reject-btn').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const form = button.closest('.js-reject-form');
+            if (!form) {
+                return;
+            }
+            const reason = window.prompt('Enter rejection reason:');
+            if (!reason) {
+                return;
+            }
+            const trimmed = reason.trim();
+            if (trimmed.length === 0) {
+                return;
+            }
+            const reasonInput = form.querySelector('input[name="rejection_reason"]');
+            if (!reasonInput) {
+                return;
+            }
+            reasonInput.value = trimmed;
+            form.submit();
+        });
     });
 });
 </script>

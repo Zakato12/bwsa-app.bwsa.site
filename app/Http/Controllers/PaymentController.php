@@ -346,6 +346,12 @@ class PaymentController extends Controller
         $sortOrder = $sortOrder === 'asc' ? 'asc' : 'desc';
 
         if (in_array(session('usr_role'), ['admin', 'official', 'treasurer'])) {
+            $activeList = (string) request('list', 'unpaid');
+            $allowedLists = ['unpaid', 'paid', 'rejected', 'cutoff'];
+            if (!in_array($activeList, $allowedLists, true)) {
+                $activeList = 'unpaid';
+            }
+
             DB::table('bills')
                 ->where('status', 'pending')
                 ->whereDate('due_date', '<', now()->toDateString())
@@ -363,144 +369,198 @@ class PaymentController extends Controller
                 }
             }
 
-            $unpaidBillsQuery = DB::table('bills')
-                ->join('users', 'bills.user_id', '=', 'users.id')
-                ->select(
-                    'bills.id',
-                    'bills.user_id',
-                    'bills.amount',
-                    DB::raw('0 as payment_method'),
-                    DB::raw("CASE WHEN bills.status = 'overdue' THEN -1 ELSE 0 END as status"),
-                    'bills.due_date',
-                    'bills.created_at',
-                    'bills.updated_at',
-                    DB::raw('NULL as ocr_text'),
-                    DB::raw('NULL as extracted_amount'),
-                    DB::raw('NULL as extracted_reference'),
-                    DB::raw('NULL as confidence_score'),
-                    DB::raw('NULL as receipt_image_path'),
-                    DB::raw('NULL as verified_at'),
-                    'users.username as user_name',
-                    'users.full_name as full_name',
-                    'bills.bill_name as bill_name',
-                    DB::raw("'bill' as row_type")
-                )
-                ->whereIn('bills.status', ['pending', 'overdue']);
+            $unpaidRecords = null;
+            $paidRecords = null;
+            $rejectedRecords = null;
+            $cutoffResidents = collect();
 
-            if ($isScopedToBarangay) {
-                $unpaidBillsQuery->join('residents', 'residents.user_id', '=', 'bills.user_id')
-                    ->where('residents.barangay_id', $barangayId);
-            }
+            if ($activeList === 'unpaid') {
+                $unpaidBillsQuery = DB::table('bills')
+                    ->join('users', 'bills.user_id', '=', 'users.id')
+                    ->select(
+                        'bills.id',
+                        'bills.user_id',
+                        'bills.amount',
+                        DB::raw('0 as payment_method'),
+                        DB::raw("CASE WHEN bills.status = 'overdue' THEN -1 ELSE 0 END as status"),
+                        'bills.due_date',
+                        'bills.created_at',
+                        'bills.updated_at',
+                        DB::raw('NULL as ocr_text'),
+                        DB::raw('NULL as extracted_amount'),
+                        DB::raw('NULL as extracted_reference'),
+                        DB::raw('NULL as confidence_score'),
+                        DB::raw('NULL as receipt_image_path'),
+                        DB::raw('NULL as verified_at'),
+                        'users.username as user_name',
+                        'users.full_name as full_name',
+                        'bills.bill_name as bill_name',
+                        DB::raw("'bill' as row_type")
+                    )
+                    ->whereIn('bills.status', ['pending', 'overdue']);
 
-            if ($search !== '') {
-                $unpaidBillsQuery->where(function ($q) use ($search) {
-                    $q->where('users.username', 'like', '%' . $search . '%')
-                        ->orWhere('users.full_name', 'like', '%' . $search . '%')
-                        ->orWhereRaw('CAST(bills.id AS CHAR) LIKE ?', ['%' . $search . '%'])
-                        ->orWhereRaw('CAST(bills.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
-                        ->orWhere('bills.bill_name', 'like', '%' . $search . '%');
-                });
-            }
-            if ($month > 0) {
-                $unpaidBillsQuery->whereMonth('bills.created_at', $month);
-            }
-            if ($year > 0) {
-                $unpaidBillsQuery->whereYear('bills.created_at', $year);
-            }
+                if ($isScopedToBarangay) {
+                    $unpaidBillsQuery->join('residents', 'residents.user_id', '=', 'bills.user_id')
+                        ->where('residents.barangay_id', $barangayId);
+                }
 
-            $unpaidPaymentsQuery = DB::table('payments')
-                ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
-                ->leftJoin('users', 'payments.user_id', '=', 'users.id')
-                ->select(
-                    'payments.id',
-                    'payments.user_id',
-                    'payments.amount',
-                    'payments.payment_method',
-                    'payments.status',
-                    DB::raw('NULL as due_date'),
-                    'payments.created_at',
-                    'payments.updated_at',
-                    'gcash_payments.ocr_text',
-                    'gcash_payments.extracted_amount',
-                    'gcash_payments.extracted_reference',
-                    'gcash_payments.confidence_score',
-                    'gcash_payments.receipt_image_path',
-                    'gcash_payments.verified_at',
-                    'users.username as user_name',
-                    'users.full_name as full_name',
-                    DB::raw("(SELECT b.bill_name FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60 ORDER BY ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) ASC, b.id DESC LIMIT 1) as bill_name"),
-                    DB::raw("'payment' as row_type")
-                )
-                ->whereIn('payments.status', [1, 2]);
+                if ($search !== '') {
+                    $unpaidBillsQuery->where(function ($q) use ($search) {
+                        $q->where('users.username', 'like', '%' . $search . '%')
+                            ->orWhere('users.full_name', 'like', '%' . $search . '%')
+                            ->orWhereRaw('CAST(bills.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                            ->orWhereRaw('CAST(bills.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
+                            ->orWhere('bills.bill_name', 'like', '%' . $search . '%');
+                    });
+                }
+                if ($month > 0) {
+                    $unpaidBillsQuery->whereMonth('bills.created_at', $month);
+                }
+                if ($year > 0) {
+                    $unpaidBillsQuery->whereYear('bills.created_at', $year);
+                }
 
-            if ($isScopedToBarangay) {
-                $unpaidPaymentsQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
-                    ->where('residents.barangay_id', $barangayId);
-            }
+                $unpaidPaymentsQuery = DB::table('payments')
+                    ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
+                    ->leftJoin('users', 'payments.user_id', '=', 'users.id')
+                    ->select(
+                        'payments.id',
+                        'payments.user_id',
+                        'payments.amount',
+                        'payments.payment_method',
+                        'payments.status',
+                        DB::raw('NULL as due_date'),
+                        'payments.created_at',
+                        'payments.updated_at',
+                        'gcash_payments.ocr_text',
+                        'gcash_payments.extracted_amount',
+                        'gcash_payments.extracted_reference',
+                        'gcash_payments.confidence_score',
+                        'gcash_payments.receipt_image_path',
+                        'gcash_payments.verified_at',
+                        'users.username as user_name',
+                        'users.full_name as full_name',
+                        DB::raw("(SELECT b.bill_name FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60 ORDER BY ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) ASC, b.id DESC LIMIT 1) as bill_name"),
+                        DB::raw("'payment' as row_type")
+                    )
+                    ->whereIn('payments.status', [1, 2]);
 
-            if ($search !== '') {
-                $unpaidPaymentsQuery->where(function ($q) use ($search) {
-                    $q->where('users.username', 'like', '%' . $search . '%')
-                        ->orWhere('users.full_name', 'like', '%' . $search . '%')
-                        ->orWhereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
-                        ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
-                });
-            }
-            if ($month > 0) {
-                $unpaidPaymentsQuery->whereMonth('payments.created_at', $month);
-            }
-            if ($year > 0) {
-                $unpaidPaymentsQuery->whereYear('payments.created_at', $year);
-            }
+                if ($isScopedToBarangay) {
+                    $unpaidPaymentsQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
+                        ->where('residents.barangay_id', $barangayId);
+                }
 
-            $unpaidRecords = DB::query()
-                ->fromSub($unpaidBillsQuery->unionAll($unpaidPaymentsQuery), 'unpaid_rows')
-                ->orderBy($sortBy, $sortOrder)
-                ->paginate(10, ['*'], 'unpaid_page')
-                ->withQueryString();
+                if ($search !== '') {
+                    $unpaidPaymentsQuery->where(function ($q) use ($search) {
+                        $q->where('users.username', 'like', '%' . $search . '%')
+                            ->orWhere('users.full_name', 'like', '%' . $search . '%')
+                            ->orWhereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                            ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%']);
+                    });
+                }
+                if ($month > 0) {
+                    $unpaidPaymentsQuery->whereMonth('payments.created_at', $month);
+                }
+                if ($year > 0) {
+                    $unpaidPaymentsQuery->whereYear('payments.created_at', $year);
+                }
 
-            $paidBaseQuery = DB::table('payments')
-                ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
-                ->leftJoin('users', 'payments.user_id', '=', 'users.id')
-                ->select(
-                    'payments.*',
-                    DB::raw("(SELECT b.bill_name FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60 ORDER BY ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) ASC, b.id DESC LIMIT 1) as bill_name"),
-                    'gcash_payments.ocr_text',
-                    'gcash_payments.extracted_amount',
-                    'gcash_payments.extracted_reference',
-                    'gcash_payments.confidence_score',
-                    'gcash_payments.receipt_image_path',
-                    'gcash_payments.verified_at',
-                    'users.username as user_name',
-                    'users.full_name as full_name'
-                )
-                ->where('payments.status', 3);
-
-            if ($isScopedToBarangay) {
-                $paidBaseQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
-                    ->where('residents.barangay_id', $barangayId);
+                $unpaidRecords = DB::query()
+                    ->fromSub($unpaidBillsQuery->unionAll($unpaidPaymentsQuery), 'unpaid_rows')
+                    ->orderBy($sortBy, $sortOrder)
+                    ->paginate(10, ['*'], 'unpaid_page')
+                    ->withQueryString();
             }
 
-            if ($search !== '') {
-                $paidBaseQuery->where(function ($q) use ($search) {
-                    $q->where('users.username', 'like', '%' . $search . '%')
-                        ->orWhere('users.full_name', 'like', '%' . $search . '%')
-                        ->orWhereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
-                        ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
-                        ->orWhereRaw("EXISTS (SELECT 1 FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.bill_name LIKE ? AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60)", ['%' . $search . '%']);
-                });
-            }
-            if ($month > 0) {
-                $paidBaseQuery->whereMonth('payments.created_at', $month);
-            }
-            if ($year > 0) {
-                $paidBaseQuery->whereYear('payments.created_at', $year);
+            if ($activeList === 'paid') {
+                $paidBaseQuery = DB::table('payments')
+                    ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
+                    ->leftJoin('users', 'payments.user_id', '=', 'users.id')
+                    ->select(
+                        'payments.*',
+                        DB::raw("(SELECT b.bill_name FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60 ORDER BY ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) ASC, b.id DESC LIMIT 1) as bill_name"),
+                        'gcash_payments.ocr_text',
+                        'gcash_payments.extracted_amount',
+                        'gcash_payments.extracted_reference',
+                        'gcash_payments.confidence_score',
+                        'gcash_payments.receipt_image_path',
+                        'gcash_payments.verified_at',
+                        'users.username as user_name',
+                        'users.full_name as full_name'
+                    )
+                    ->where('payments.status', 3);
+
+                if ($isScopedToBarangay) {
+                    $paidBaseQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
+                        ->where('residents.barangay_id', $barangayId);
+                }
+
+                if ($search !== '') {
+                    $paidBaseQuery->where(function ($q) use ($search) {
+                        $q->where('users.username', 'like', '%' . $search . '%')
+                            ->orWhere('users.full_name', 'like', '%' . $search . '%')
+                            ->orWhereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                            ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
+                            ->orWhereRaw("EXISTS (SELECT 1 FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.bill_name LIKE ? AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60)", ['%' . $search . '%']);
+                    });
+                }
+                if ($month > 0) {
+                    $paidBaseQuery->whereMonth('payments.created_at', $month);
+                }
+                if ($year > 0) {
+                    $paidBaseQuery->whereYear('payments.created_at', $year);
+                }
+
+                $paidRecords = $paidBaseQuery
+                    ->orderBy($sortBy === 'due_date' ? 'created_at' : $sortBy, $sortOrder)
+                    ->paginate(10, ['*'], 'paid_page')
+                    ->withQueryString();
             }
 
-            $paidRecords = $paidBaseQuery
-                ->orderBy($sortBy === 'due_date' ? 'created_at' : $sortBy, $sortOrder)
-                ->paginate(10, ['*'], 'paid_page')
-                ->withQueryString();
+            if ($activeList === 'rejected') {
+                $rejectedBaseQuery = DB::table('payments')
+                    ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
+                    ->leftJoin('users', 'payments.user_id', '=', 'users.id')
+                    ->leftJoin('users as rejectors', 'gcash_payments.rejected_by', '=', 'rejectors.id')
+                    ->select(
+                        'payments.*',
+                        DB::raw("(SELECT b.bill_name FROM bills b WHERE b.user_id = payments.user_id AND b.status = 'paid' AND b.paid_at IS NOT NULL AND ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) <= 60 ORDER BY ABS(TIMESTAMPDIFF(SECOND, b.paid_at, payments.created_at)) ASC, b.id DESC LIMIT 1) as bill_name"),
+                        'gcash_payments.receipt_image_path',
+                        'gcash_payments.rejection_reason',
+                        'gcash_payments.rejected_at',
+                        'gcash_payments.rejected_by',
+                        'users.username as user_name',
+                        'users.full_name as full_name',
+                        'rejectors.full_name as rejected_by_name'
+                    )
+                    ->where('payments.status', 4);
+
+                if ($isScopedToBarangay) {
+                    $rejectedBaseQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
+                        ->where('residents.barangay_id', $barangayId);
+                }
+
+                if ($search !== '') {
+                    $rejectedBaseQuery->where(function ($q) use ($search) {
+                        $q->where('users.username', 'like', '%' . $search . '%')
+                            ->orWhere('users.full_name', 'like', '%' . $search . '%')
+                            ->orWhereRaw('CAST(payments.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                            ->orWhereRaw('CAST(payments.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
+                            ->orWhere('gcash_payments.rejection_reason', 'like', '%' . $search . '%');
+                    });
+                }
+                if ($month > 0) {
+                    $rejectedBaseQuery->whereMonth('payments.created_at', $month);
+                }
+                if ($year > 0) {
+                    $rejectedBaseQuery->whereYear('payments.created_at', $year);
+                }
+
+                $rejectedRecords = $rejectedBaseQuery
+                    ->orderBy($sortBy === 'due_date' ? 'created_at' : $sortBy, $sortOrder)
+                    ->paginate(10, ['*'], 'rejected_page')
+                    ->withQueryString();
+            }
 
             $yearsQuery = DB::table('payments');
             if ($isScopedToBarangay) {
@@ -516,9 +576,11 @@ class PaymentController extends Controller
                 ->filter()
                 ->values();
 
-            $cutoffResidents = collect();
             $canViewCutoffList = in_array(session('usr_role'), ['official', 'treasurer'], true);
-            if ($canViewCutoffList) {
+            if ($activeList === 'cutoff') {
+                if (!$canViewCutoffList) {
+                    $activeList = 'unpaid';
+                } else {
                 $cutoffResidentsQuery = DB::table('bills')
                     ->join('users', 'bills.user_id', '=', 'users.id')
                     ->select(
@@ -548,11 +610,19 @@ class PaymentController extends Controller
                     });
                 }
 
-                $cutoffResidents = $cutoffResidentsQuery->get();
+                    $cutoffResidents = $cutoffResidentsQuery
+                        ->paginate(10, ['*'], 'cutoff_page')
+                        ->withQueryString();
+                }
             }
 
-            return view('payments.index', compact('unpaidRecords', 'paidRecords', 'cutoffResidents', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions'));
+            return view('payments.index', compact('unpaidRecords', 'paidRecords', 'rejectedRecords', 'cutoffResidents', 'activeList', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions'));
         } else {
+            $activeResidentList = (string) request('my_list', 'unpaid_bills');
+            if (!in_array($activeResidentList, ['unpaid_bills', 'paid_bills', 'payments'], true)) {
+                $activeResidentList = 'unpaid_bills';
+            }
+
             DB::table('bills')
                 ->where('user_id', session('usr_id'))
                 ->where('status', 'pending')
@@ -568,7 +638,7 @@ class PaymentController extends Controller
                 ->count();
             $cutoffNoticeActive = $unpaidBillCount >= 3;
 
-            $billsQuery = DB::table('bills')
+            $unpaidBillsQuery = DB::table('bills')
                 ->select(
                     'bills.*',
                     DB::raw("CASE WHEN bills.status IN ('pending','overdue') AND CURDATE() > bills.due_date THEN bills.amount * 2 ELSE bills.amount END AS amount_due"),
@@ -578,23 +648,47 @@ class PaymentController extends Controller
                 ->whereIn('status', ['pending', 'overdue']);
 
             if ($search !== '') {
-                $billsQuery->where(function ($q) use ($search) {
+                $unpaidBillsQuery->where(function ($q) use ($search) {
                     $q->whereRaw('CAST(bills.id AS CHAR) LIKE ?', ['%' . $search . '%'])
                         ->orWhereRaw('CAST(bills.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
                         ->orWhere('bills.bill_name', 'like', '%' . $search . '%');
                 });
             }
 
-            $bills = $billsQuery
+            $unpaidBills = $unpaidBillsQuery
                 ->orderBy($sortBy, $sortOrder)
-                ->paginate(10, ['*'], 'my_bills_page')
+                ->paginate(10, ['*'], 'my_unpaid_bills_page')
+                ->withQueryString();
+
+            $paidBillsQuery = DB::table('bills')
+                ->select('bills.*')
+                ->where('user_id', session('usr_id'))
+                ->where('status', 'paid');
+
+            if ($search !== '') {
+                $paidBillsQuery->where(function ($q) use ($search) {
+                    $q->whereRaw('CAST(bills.id AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('CAST(bills.amount AS CHAR) LIKE ?', ['%' . $search . '%'])
+                        ->orWhere('bills.bill_name', 'like', '%' . $search . '%');
+                });
+            }
+            if ($month > 0) {
+                $paidBillsQuery->whereMonth('bills.created_at', $month);
+            }
+            if ($year > 0) {
+                $paidBillsQuery->whereYear('bills.created_at', $year);
+            }
+
+            $paidBills = $paidBillsQuery
+                ->orderBy($sortBy === 'due_date' ? 'created_at' : $sortBy, $sortOrder)
+                ->paginate(10, ['*'], 'my_paid_bills_page')
                 ->withQueryString();
 
             $paymentsQuery = DB::table('payments')
                 ->where('user_id', session('usr_id'))
                 ->where('status', '>', 0)
                 ->leftJoin('gcash_payments', 'payments.id', '=', 'gcash_payments.payment_id')
-                ->select('payments.*', 'gcash_payments.ocr_text', 'gcash_payments.extracted_amount', 'gcash_payments.extracted_reference', 'gcash_payments.confidence_score', 'gcash_payments.receipt_image_path', 'gcash_payments.verified_at')
+                ->select('payments.*', 'gcash_payments.ocr_text', 'gcash_payments.extracted_amount', 'gcash_payments.extracted_reference', 'gcash_payments.confidence_score', 'gcash_payments.receipt_image_path', 'gcash_payments.verified_at', 'gcash_payments.rejection_reason', 'gcash_payments.rejected_at')
                 ;
 
             if ($search !== '') {
@@ -625,7 +719,7 @@ class PaymentController extends Controller
                 ->filter()
                 ->values();
 
-            return view('payments.index', compact('bills', 'payments', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions', 'unpaidBillCount', 'cutoffNoticeActive'));
+            return view('payments.index', compact('unpaidBills', 'paidBills', 'payments', 'activeResidentList', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions', 'unpaidBillCount', 'cutoffNoticeActive'));
         }
     }
 
@@ -646,6 +740,9 @@ class PaymentController extends Controller
 
         if ((int) $payment->payment_method !== 2) {
             return redirect()->back()->with('error', 'Only GCash payments require OCR verification.');
+        }
+        if ((int) $payment->status !== 1) {
+            return redirect()->back()->with('error', 'Only pending payments can be verified.');
         }
 
         $gcash = DB::table('gcash_payments')
@@ -679,7 +776,13 @@ class PaymentController extends Controller
         }
 
         DB::table('payments')->where('id', $id)->update(['status' => 2, 'updated_at' => now()]);
-        DB::table('gcash_payments')->where('payment_id', $id)->update(['verified_at' => now(), 'updated_at' => now()]);
+        DB::table('gcash_payments')->where('payment_id', $id)->update([
+            'verified_at' => now(),
+            'rejection_reason' => null,
+            'rejected_at' => null,
+            'rejected_by' => null,
+            'updated_at' => now(),
+        ]);
         Log::info('payments.verified', [
             'actor_id' => session('usr_id'),
             'payment_id' => $id,
@@ -688,6 +791,64 @@ class PaymentController extends Controller
             'payment_id' => $id,
         ]);
         return redirect()->back()->with('success', 'Payment verified.');
+    }
+
+    public function reject(Request $request, $id)
+    {
+        if ($redirect = $this->requireRole(['treasurer'])) {
+            return $redirect;
+        }
+
+        $validated = $request->validate([
+            'rejection_reason' => 'required|string|max:255',
+        ]);
+
+        $payment = DB::table('payments')->where('id', $id)->first();
+        if (!$payment) {
+            return redirect()->back()->with('error', 'Payment not found.');
+        }
+
+        if ($redirect = $this->requireRoleInBarangay(['treasurer'], (int) $payment->user_id)) {
+            return $redirect;
+        }
+
+        if ((int) $payment->payment_method !== 2) {
+            return redirect()->back()->with('error', 'Only GCash payments can be rejected here.');
+        }
+
+        if (!in_array((int) $payment->status, [1, 2], true)) {
+            return redirect()->back()->with('error', 'Only pending or verified payments can be rejected.');
+        }
+
+        $gcash = DB::table('gcash_payments')->where('payment_id', $id)->first();
+        if (!$gcash) {
+            return redirect()->back()->with('error', 'GCash receipt record not found.');
+        }
+
+        DB::table('payments')->where('id', $id)->update([
+            'status' => 4,
+            'updated_at' => now(),
+        ]);
+
+        DB::table('gcash_payments')->where('payment_id', $id)->update([
+            'rejection_reason' => $validated['rejection_reason'],
+            'rejected_at' => now(),
+            'rejected_by' => (int) session('usr_id'),
+            'verified_at' => null,
+            'updated_at' => now(),
+        ]);
+
+        Log::info('payments.rejected', [
+            'actor_id' => session('usr_id'),
+            'payment_id' => (int) $id,
+            'reason' => $validated['rejection_reason'],
+        ]);
+        $this->appendAuditLedger('payments.rejected', [
+            'payment_id' => (int) $id,
+            'reason' => $validated['rejection_reason'],
+        ]);
+
+        return redirect()->back()->with('success', 'Payment rejected.');
     }
 
     public function reprocessOcr($id)
