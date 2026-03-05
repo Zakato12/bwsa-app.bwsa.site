@@ -1,7 +1,7 @@
 # Secure Web Architecture (Thesis Document)
 
 **Project:** BWASA Thesis System  
-**Date:** February 7, 2026  
+**Date:** February 25, 2026  
 **Scope:** Laravel web application with payments, residents, barangays, and user management.  
 **Thesis Title:** RBAC‑Enabled Secure Web Architecture for Decentralized Utility Payment Systems with GCash Verification Workflow
 
@@ -57,7 +57,7 @@ Key files reviewed:
 - **Tampering:** direct DB writes in controllers risk improper authorization checks.
 - **Repudiation:** limited audit logging means weak non-repudiation.
 - **Information Disclosure:** receipt images in public disk risk exposure.
-- **Denial of Service:** OCR execution is resource intensive and unthrottled.
+- **Denial of Service:** OCR execution is resource intensive and can be abused without queueing and rate limits.
 - **Elevation of Privilege:** role checks are inconsistent and enforced in code paths rather than centralized policies.
 
 ## Target-State Secure Architecture
@@ -402,6 +402,20 @@ php artisan config:cache
   - Extracted amount and extracted reference preview
 - OCR can be manually retriggered by treasurer:
   - `POST /payments/{id}/ocr/reprocess`
+- GCash rejection flow is implemented for treasurer review:
+  - `POST /payments/{id}/reject`
+  - Requires non-empty rejection reason
+  - Writes `payments.status = 4` and rejection metadata in `gcash_payments`
+- Status transition constraints are enforced:
+  - `verify`: allowed only for pending GCash (`status = 1`) with OCR-ready extracted amount match
+  - `approve`: allowed only for verified payments (`status = 2`)
+  - `reject`: allowed for pending or verified GCash (`status IN (1,2)`)
+
+### GCash Rejection Metadata
+- `gcash_payments.rejection_reason` stores treasurer-provided reason
+- `gcash_payments.rejected_at` stores rejection timestamp
+- `gcash_payments.rejected_by` stores rejecting treasurer user ID
+- On successful verification, rejection fields are cleared to keep state consistent
 
 ### Transport Security
 - Enforce TLS 1.2+ and HSTS.
@@ -431,6 +445,8 @@ Route::middleware(['session.auth'])->group(function () {
     Route::resource('residents', ResidentController::class)->middleware('role:official');
     Route::get('/payments', ...); // admin, official, treasurer, resident
     Route::post('/payments/{id}/verify', ...)->middleware('role:treasurer');
+    Route::post('/payments/{id}/ocr/reprocess', ...)->middleware(['role:treasurer', 'throttle:20,1']);
+    Route::post('/payments/{id}/reject', ...)->middleware(['role:treasurer', 'throttle:20,1']);
     Route::post('/payments/{id}/approve', ...)->middleware('role:treasurer');
     Route::get('/payments/walkin/create', ...)->middleware('role:treasurer');
 });
@@ -443,9 +459,11 @@ Route::middleware(['session.auth'])->group(function () {
 4. Treasurer may trigger OCR reprocess for failed/pending extraction
 5. Treasurer verifies only after OCR integrity checks pass:
    - OCR is not pending/failed
+   - OCR extracted amount is present
    - Extracted amount matches submitted payment amount
-6. Treasurer approves payment -> status updated -> audit log entry
-   - Note: current implementation does not strictly require prior verified status before approval
+6. Treasurer either rejects (with reason) or approves after verification:
+   - Reject sets payment to rejected state with recorded reason and actor
+   - Approve requires verified state and sets payment as approved
 7. Treasurer records walk-in payments -> status approved -> audit log entry
 
 ## Risks and Mitigations (Selected)
@@ -490,6 +508,7 @@ requireRoleInBarangay(roles, targetUserId = null, targetBarangayId = null)
 - `PaymentController::index` allows `admin`, `official`, `treasurer`, `resident`
 - `PaymentController::verify` allows `treasurer`
 - `PaymentController::reprocessOcr` allows `treasurer`
+- `PaymentController::reject` allows `treasurer`
 - `PaymentController::approve` allows `treasurer`
 - `PaymentController::createBill` allows `treasurer`
 - `PaymentController::storeBill` allows `treasurer`

@@ -1,13 +1,13 @@
 # Chapter 1 - Introduction
 
 ## 1.1 Background of the Study
-Barangay water services manage household billing, payment verification, and resident records. These systems handle sensitive personal and financial information and involve multiple roles with distinct responsibilities. Without strong access boundaries, auditability, and role-specific controls, such systems are vulnerable to unauthorized access, weak accountability, and inconsistent verification outcomes.
+Barangay water services manage household billing, payment verification, and resident records. These systems handle sensitive personal and financial information and involve multiple roles with distinct responsibilities. Without strong access boundaries, auditability, and role-specific controls, such systems are vulnerable to unauthorized access, weak accountability, and inconsistent verification outcomes [1, 2].
 
 ## 1.2 Problem Statement
-Barangay water payment systems require secure, role-scoped access control and auditability across multiple local jurisdictions. Many implementations lack enforceable boundaries between roles and barangays, resulting in risks such as data leakage, privilege misuse, and untraceable changes. This study addresses the design and evaluation of a role-based access control (RBAC) architecture with barangay-scoped governance and audit logging for a web-based water billing system.
+Barangay water payment systems require secure, role-scoped access control and auditability across multiple local jurisdictions. Many implementations lack enforceable boundaries between roles and barangays, resulting in risks such as data leakage, privilege misuse, and untraceable changes. This study addresses the design and evaluation of a role-based access control (RBAC) architecture with barangay-scoped governance and audit logging for a web-based water billing system [1, 3].
 
 ## 1.3 General Objective
-Design, implement, and evaluate an RBAC-enabled secure web architecture for decentralized barangay water utility payments with a GCash verification workflow, enforcing role and barangay boundaries while maintaining auditability and operational continuity.
+Design, implement, and evaluate an RBAC-enabled secure web architecture for decentralized barangay water utility payments with a GCash verification workflow, enforcing role and barangay boundaries while maintaining auditability and operational continuity [3, 4].
 
 ## 1.4 Specific Objectives
 1. Model the roles and permissions for Admin, Official, Treasurer, and Resident based on domain workflows.
@@ -19,11 +19,11 @@ Design, implement, and evaluate an RBAC-enabled secure web architecture for dece
 
 ## 1.5 Scope and Limitations
 - Focus is on role enforcement, data isolation, and auditability within a single application.
-- External payment gateways and full compliance standards (for example PCI DSS) are out of scope.
+- External payment gateways and full compliance standards (for example PCI DSS) are out of scope [5].
 - The architecture supports a hybrid decentralized model; full distributed consensus is not implemented.
 
 ## 1.6 Significance of the Study
-This study provides a defensible RBAC design tailored to local governance workflows. It contributes practical guidance for securing barangay-level billing systems and offers an evaluable framework for access control and auditability in similar public service domains.
+This study provides a defensible RBAC design tailored to local governance workflows. It contributes practical guidance for securing barangay-level billing systems and offers an evaluable framework for access control and auditability in similar public service domains [1, 2].
 
 ## 1.7 Methodology (Design-Implement-Evaluate)
 1. **Requirements Analysis**
@@ -51,11 +51,11 @@ This study provides a defensible RBAC design tailored to local governance workfl
 - If OCR is unavailable, the system falls back to manual receipt validation by authorized personnel, preserving service continuity and control.
 
 ### Current Limitation
-- OCR accuracy may vary due to image quality, lighting, and receipt format differences.
+- OCR accuracy may vary due to image quality, lighting, and receipt format differences [6].
 - OCR output is assistive data only and is not treated as final authority for approval decisions.
 
 ### Future Improvements
-1. Improve OCR reliability through better image preprocessing and model tuning.
+1. Improve OCR reliability through better image preprocessing and model tuning [6].
 2. Add confidence thresholds and stricter exception handling for low-confidence extraction.
 3. Expand support for additional receipt formats and payment providers.
 4. Optimize asynchronous OCR processing for faster and more scalable verification.
@@ -72,3 +72,16 @@ If asked, "Why include OCR if the system works without it?"
 4. Security controls that prevent unauthorized role actions and cross-barangay data access.
 5. Audit logs that provide traceable records of critical user and payment-related actions.
 6. Automated and functional test results demonstrating that core workflows and security controls operate as designed.
+
+## References
+[1] Dipta Das, Andrew Walker, Vincent Bushong, Jan Svacina, Tomas Cerny, and Vashek Matyas. 2021. On automated RBAC assessment by constructing a centralized perspective for microservice mesh. *PeerJ Computer Science* 7 (2021), e376. https://doi.org/10.7717/peerj-cs.376
+
+[2] OWASP Foundation. 2025. OWASP Top 10:2025. Retrieved March 5, 2026 from https://owasp.org/Top10/2025/
+
+[3] National Institute of Standards and Technology. 2024. *The NIST Cybersecurity Framework (CSF) 2.0*. NIST CSWP 29. https://doi.org/10.6028/NIST.CSWP.29
+
+[4] Verizon. 2024. *2024 Data Breach Investigations Report*. Retrieved March 5, 2026 from https://www.verizon.com/business/resources/T241/reports/2024-dbir-data-breach-investigations-report.pdf
+
+[5] PCI Security Standards Council. 2022. *Payment Card Industry Data Security Standard: Requirements and Testing Procedures, Version 4.0*. PCI Security Standards Council.
+
+[6] Minghao Li, Tengchao Lv, Jingye Chen, Lei Cui, Yijuan Lu, Dinei Florencio, Cha Zhang, Zhoujun Li, and Furu Wei. 2021. TrOCR: Transformer-based optical character recognition with pre-trained models. *arXiv* (2021). https://doi.org/10.48550/arXiv.2109.10282
