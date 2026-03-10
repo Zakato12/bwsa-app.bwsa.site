@@ -28,14 +28,22 @@
                                 <a href="{{ url('/users/add') }}">Add User</a>
                             </li>
 
-                            <li class="{{ request()->is('users/list') ? 'active' : '' }}">
+                            <li class="{{ request()->is('users/list') && !request('archived') ? 'active' : '' }}">
                                 <a href="{{ url('/users/list') }}">User List</a>
+                            </li>
+                            <li class="{{ request()->is('users/list') && request('archived') ? 'active' : '' }}">
+                                <a href="{{ url('/users/list?archived=1') }}">Archived Users</a>
                             </li>
                         </ul>
                     </li>
 
                     <!-- Barangays -->
-                    <li class="{{ request()->is('barangays*') ? 'active' : '' }}">
+                    <li class="{{ request()->is('barangays') && request('archived') ? 'active' : '' }}">
+                        <a href="{{ url('/barangays?archived=1') }}">
+                            <i class="fas fa-archive"></i> <span>Archived Barangays</span>
+                        </a>
+                    </li>
+                    <li class="{{ request()->is('barangays*') && !request('archived') ? 'active' : '' }}">
                         <a href="{{ url('/barangays') }}">
                             <i class="fas fa-map-marker-alt"></i> <span>Barangays</span>
                         </a>
@@ -50,8 +58,11 @@
                     </a>
 
                     <ul class="sublist">
-                        <li class="{{ request()->is('residents') ? 'active' : '' }}">
+                        <li class="{{ request()->is('residents') && !request('archived') ? 'active' : '' }}">
                             <a href="{{ url('/residents') }}">View Residents</a>
+                        </li>
+                        <li class="{{ request()->is('residents') && request('archived') ? 'active' : '' }}">
+                            <a href="{{ url('/residents?archived=1') }}">Archived Residents</a>
                         </li>
 
                         <li class="{{ request()->is('residents/create') ? 'active' : '' }}">

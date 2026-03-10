@@ -31,6 +31,13 @@ def extract_amount(text):
 def extract_reference(text):
     month_pattern = r"(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|SEPT|OCT|NOV|DEC)"
     marker_pattern = r"(?:Ref(?:erence)?(?:\s*[\.:])?\s*(?:No\.?|Number)?|Transaction\s*(?:ID|No\.?))"
+
+    def sanitize_numeric_reference(value):
+        digits_only = re.sub(r"\D", "", value or "")
+        if 10 <= len(digits_only) <= 13:
+            return digits_only
+        return None
+
     marker = re.search(marker_pattern, text, re.IGNORECASE)
     if marker:
         # Include following chars so wrapped reference digits on the next line are considered.
@@ -41,14 +48,17 @@ def extract_reference(text):
         raw = re.sub(r"\bAM\b|\bPM\b", " ", raw)
         raw = re.sub(r"[^A-Z0-9\s\-]", " ", raw)
 
-        digit_groups = re.findall(r"\d{3,}", raw)
+        digit_groups = re.findall(r"\d{2,}", raw)
         if digit_groups:
-            if len(digit_groups[0]) >= 10:
-                return digit_groups[0]
-
-            candidate = "".join(digit_groups[:3])
-            if 6 <= len(candidate) <= 16:
+            merged = "".join(digit_groups[:4])
+            candidate = sanitize_numeric_reference(merged)
+            if candidate:
                 return candidate
+
+            for group in digit_groups:
+                candidate = sanitize_numeric_reference(group)
+                if candidate:
+                    return candidate
 
     patterns = [
         r"(?:Ref(?:erence)?(?:\s*[\.:])?\s*(?:No\.?|Number)?\s*[:\-]?\s*)([A-Z0-9][A-Z0-9\-\s]{5,})",
@@ -59,8 +69,8 @@ def extract_reference(text):
         if match:
             raw = match.group(1).upper().strip()
             raw = re.split(rf"\b{month_pattern}\b|\b\d{{1,2}}:\d{{2}}\b|\bAM\b|\bPM\b", raw, maxsplit=1)[0]
-            candidate = re.sub(r"[^A-Z0-9\-]", "", raw)
-            if len(candidate) >= 6:
+            candidate = sanitize_numeric_reference(raw)
+            if candidate:
                 return candidate
     return None
 

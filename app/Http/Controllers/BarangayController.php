@@ -15,6 +15,8 @@ class BarangayController extends Controller
         }
 
         $search = trim((string) request('q', ''));
+        $showArchived = request()->boolean('archived');
+        $inactiveStatuses = [0, '0', 'inactive'];
 
         $query = DB::table('barangays')
             ->select('barangays.*')
@@ -23,6 +25,12 @@ class BarangayController extends Controller
                     ->selectRaw('COUNT(*)')
                     ->whereColumn('residents.barangay_id', 'barangays.id');
             }, 'resident_count');
+
+        if ($showArchived) {
+            $query->whereIn('barangays.status', $inactiveStatuses);
+        } else {
+            $query->whereNotIn('barangays.status', $inactiveStatuses);
+        }
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -38,7 +46,7 @@ class BarangayController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        return view('pages.barangays.index', compact('barangays', 'search'));
+        return view('pages.barangays.index', compact('barangays', 'search', 'showArchived'));
     }
 
     public function create()
@@ -108,14 +116,26 @@ class BarangayController extends Controller
             return redirect()->route('barangays.index')->with('error', 'Barangay not found');
         }
 
-        DB::table('barangays')->where('id', $id)->update([
-            'name' => $validated['name'],
-            'brgy_code' => $barangay->brgy_code ?: $this->generateBarangayCode($validated['name'], (int) $id),
-            'address' => $validated['address'],
-            'status' => $validated['status'],
-            'payment_amount_per_bill' => $validated['payment_amount_per_bill'],
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($id, $validated, $barangay) {
+            DB::table('barangays')->where('id', $id)->update([
+                'name' => $validated['name'],
+                'brgy_code' => $barangay->brgy_code ?: $this->generateBarangayCode($validated['name'], (int) $id),
+                'address' => $validated['address'],
+                'status' => $validated['status'],
+                'payment_amount_per_bill' => $validated['payment_amount_per_bill'],
+                'updated_at' => now(),
+            ]);
+
+            if ((string) $validated['status'] === '0') {
+                DB::table('users')
+                    ->where('barangay_id', $id)
+                    ->where('status', '!=', 'inactive')
+                    ->update([
+                        'status' => 'inactive',
+                        'updated_at' => now(),
+                    ]);
+            }
+        });
 
         return redirect()->route('barangays.index')->with('success', 'Barangay updated successfully');
     }
@@ -126,10 +146,20 @@ class BarangayController extends Controller
             return $redirect;
         }
 
-        DB::table('barangays')->where('id', $id)->update([
-            'status' => 'inactive',
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($id) {
+            DB::table('barangays')->where('id', $id)->update([
+                'status' => 0,
+                'updated_at' => now(),
+            ]);
+
+            DB::table('users')
+                ->where('barangay_id', $id)
+                ->where('status', '!=', 'inactive')
+                ->update([
+                    'status' => 'inactive',
+                    'updated_at' => now(),
+                ]);
+        });
         return redirect()->route('barangays.index')->with('success', 'Barangay deleted successfully');
     }
 

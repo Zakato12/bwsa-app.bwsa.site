@@ -17,6 +17,18 @@
         <div class="col-sm-8 col-md-5">
             <input type="text" name="q" class="form-control" placeholder="Search by ID, user, or amount" value="{{ $search ?? '' }}">
         </div>
+        @if(session('usr_role') === 'admin')
+            <div class="col-sm-4 col-md-3">
+                <select name="barangay_id" class="form-control">
+                    <option value="0">All Barangays</option>
+                    @foreach(($barangayFilters ?? collect()) as $barangayFilter)
+                        <option value="{{ $barangayFilter->id }}" {{ (int) ($selectedBarangayId ?? 0) === (int) $barangayFilter->id ? 'selected' : '' }}>
+                            {{ $barangayFilter->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
         <div class="col-sm-4 col-md-2">
             <select name="month" class="form-control">
                 <option value="0">All Months</option>

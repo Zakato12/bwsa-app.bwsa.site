@@ -331,6 +331,11 @@ class PaymentController extends Controller
         $sortOrder = request('sort_order', 'desc');
         $month = (int) request('month', 0);
         $year = (int) request('year', 0);
+        $selectedBarangayId = (int) request('barangay_id', 0);
+        if ($selectedBarangayId < 0) {
+            $selectedBarangayId = 0;
+        }
+        $barangayFilters = collect();
 
         if ($month < 1 || $month > 12) {
             $month = 0;
@@ -346,6 +351,15 @@ class PaymentController extends Controller
         $sortOrder = $sortOrder === 'asc' ? 'asc' : 'desc';
 
         if (in_array(session('usr_role'), ['admin', 'official', 'treasurer'])) {
+            if (session('usr_role') === 'admin') {
+                $barangayFilters = DB::table('barangays')
+                    ->select('id', 'name')
+                    ->orderBy('name')
+                    ->get();
+            } else {
+                $selectedBarangayId = 0;
+            }
+
             $activeList = (string) request('list', 'unpaid');
             $allowedLists = ['unpaid', 'paid', 'rejected', 'cutoff'];
             if (!in_array($activeList, $allowedLists, true)) {
@@ -368,6 +382,18 @@ class PaymentController extends Controller
                     return redirect()->route('dashboard')->with('error', 'Barangay assignment required.');
                 }
             }
+            $applyBarangayScope = function ($query, string $userIdColumn) use ($isScopedToBarangay, $barangayId, $selectedBarangayId) {
+                if ($isScopedToBarangay) {
+                    $query->join('residents', 'residents.user_id', '=', $userIdColumn)
+                        ->where('residents.barangay_id', $barangayId);
+                    return;
+                }
+
+                if ($selectedBarangayId > 0) {
+                    $query->join('residents', 'residents.user_id', '=', $userIdColumn)
+                        ->where('residents.barangay_id', $selectedBarangayId);
+                }
+            };
 
             $unpaidRecords = null;
             $paidRecords = null;
@@ -399,10 +425,7 @@ class PaymentController extends Controller
                     )
                     ->whereIn('bills.status', ['pending', 'overdue']);
 
-                if ($isScopedToBarangay) {
-                    $unpaidBillsQuery->join('residents', 'residents.user_id', '=', 'bills.user_id')
-                        ->where('residents.barangay_id', $barangayId);
-                }
+                $applyBarangayScope($unpaidBillsQuery, 'bills.user_id');
 
                 if ($search !== '') {
                     $unpaidBillsQuery->where(function ($q) use ($search) {
@@ -445,10 +468,7 @@ class PaymentController extends Controller
                     )
                     ->whereIn('payments.status', [1, 2]);
 
-                if ($isScopedToBarangay) {
-                    $unpaidPaymentsQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
-                        ->where('residents.barangay_id', $barangayId);
-                }
+                $applyBarangayScope($unpaidPaymentsQuery, 'payments.user_id');
 
                 if ($search !== '') {
                     $unpaidPaymentsQuery->where(function ($q) use ($search) {
@@ -490,10 +510,7 @@ class PaymentController extends Controller
                     )
                     ->where('payments.status', 3);
 
-                if ($isScopedToBarangay) {
-                    $paidBaseQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
-                        ->where('residents.barangay_id', $barangayId);
-                }
+                $applyBarangayScope($paidBaseQuery, 'payments.user_id');
 
                 if ($search !== '') {
                     $paidBaseQuery->where(function ($q) use ($search) {
@@ -535,10 +552,7 @@ class PaymentController extends Controller
                     )
                     ->where('payments.status', 4);
 
-                if ($isScopedToBarangay) {
-                    $rejectedBaseQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
-                        ->where('residents.barangay_id', $barangayId);
-                }
+                $applyBarangayScope($rejectedBaseQuery, 'payments.user_id');
 
                 if ($search !== '') {
                     $rejectedBaseQuery->where(function ($q) use ($search) {
@@ -563,10 +577,7 @@ class PaymentController extends Controller
             }
 
             $yearsQuery = DB::table('payments');
-            if ($isScopedToBarangay) {
-                $yearsQuery->join('residents', 'residents.user_id', '=', 'payments.user_id')
-                    ->where('residents.barangay_id', $barangayId);
-            }
+            $applyBarangayScope($yearsQuery, 'payments.user_id');
             $yearOptions = $yearsQuery
                 ->selectRaw('YEAR(payments.created_at) as year_value')
                 ->whereNotNull('payments.created_at')
@@ -598,10 +609,7 @@ class PaymentController extends Controller
                     ->orderBy('unpaid_total', 'desc')
                     ->orderBy('oldest_due_date', 'asc');
 
-                if ($isScopedToBarangay) {
-                    $cutoffResidentsQuery->join('residents', 'residents.user_id', '=', 'bills.user_id')
-                        ->where('residents.barangay_id', $barangayId);
-                }
+                $applyBarangayScope($cutoffResidentsQuery, 'bills.user_id');
 
                 if ($search !== '') {
                     $cutoffResidentsQuery->where(function ($q) use ($search) {
@@ -616,7 +624,7 @@ class PaymentController extends Controller
                 }
             }
 
-            return view('payments.index', compact('unpaidRecords', 'paidRecords', 'rejectedRecords', 'cutoffResidents', 'activeList', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions'));
+            return view('payments.index', compact('unpaidRecords', 'paidRecords', 'rejectedRecords', 'cutoffResidents', 'activeList', 'sortBy', 'sortOrder', 'search', 'month', 'year', 'yearOptions', 'selectedBarangayId', 'barangayFilters'));
         } else {
             $activeResidentList = (string) request('my_list', 'unpaid_bills');
             if (!in_array($activeResidentList, ['unpaid_bills', 'paid_bills', 'payments'], true)) {

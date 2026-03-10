@@ -15,13 +15,19 @@ class ResidentController extends Controller
         }
 
         $search = trim((string) request('q', ''));
+        $showArchived = request()->boolean('archived');
 
         $query = DB::table('residents')
             ->join('users', 'residents.user_id', '=', 'users.id')
             ->join('barangays', 'residents.barangay_id', '=', 'barangays.id')
             ->select('residents.id', 'users.full_name', 'users.username', 'barangays.name as barangay', 'residents.created_at', 'residents.address', 'residents.contact_number')
-            ->where('users.status', 'active')
             ->orderBy('residents.created_at', 'desc');
+
+        if ($showArchived) {
+            $query->where('users.status', 'inactive');
+        } else {
+            $query->where('users.status', 'active');
+        }
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -42,7 +48,7 @@ class ResidentController extends Controller
 
         $residents = $query->paginate(10)->withQueryString();
 
-        return view('pages.residents.index', compact('residents', 'search'));
+        return view('pages.residents.index', compact('residents', 'search', 'showArchived'));
     }
 
     public function create()

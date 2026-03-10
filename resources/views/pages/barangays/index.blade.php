@@ -6,9 +6,19 @@
     <div>
         <h1>Barangays</h1>
 
-        <a href="{{ route('barangays.create') }}" class="btn btn-primary mb-3">Add Barangay</a>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <a href="{{ route('barangays.create') }}" class="btn btn-primary">Add Barangay</a>
+            @if(($showArchived ?? false))
+                <a href="{{ route('barangays.index') }}" class="btn btn-outline-secondary">Show Active Barangays</a>
+            @else
+                <a href="{{ route('barangays.index', ['archived' => 1]) }}" class="btn btn-outline-dark">Show Archived Barangays</a>
+            @endif
+        </div>
 
         <form method="GET" action="{{ route('barangays.index') }}" class="row g-2 mb-3">
+            @if(($showArchived ?? false))
+                <input type="hidden" name="archived" value="1">
+            @endif
             <div class="col-sm-8 col-md-5">
                 <input type="text" name="q" class="form-control" placeholder="Search barangays" value="{{ $search ?? '' }}">
             </div>
@@ -16,7 +26,7 @@
                 <button type="submit" class="btn btn-outline-primary">Search</button>
             </div>
             <div class="col-auto">
-                <a href="{{ route('barangays.index') }}" class="btn btn-outline-secondary">Reset</a>
+                <a href="{{ route('barangays.index', ($showArchived ?? false) ? ['archived' => 1] : []) }}" class="btn btn-outline-secondary">Reset</a>
             </div>
         </form>
 

@@ -14,6 +14,7 @@ class UserController extends Controller
         }
 
         $search = trim((string) request('q', ''));
+        $showArchived = request()->boolean('archived');
 
         $query = DB::table('users')
             ->join('roles', 'users.role_id', '=', 'roles.id')
@@ -21,6 +22,12 @@ class UserController extends Controller
             ->select('users.id', 'users.username', 'users.full_name', 'roles.name as role', 'barangays.name as barangay_name', 'users.status', 'users.created_at', 'users.barangay_id', 'users.role_id')
             ->where('users.id', '!=', '4')
             ->where('users.id', '!=', '1');
+
+        if ($showArchived) {
+            $query->where('users.status', 'inactive');
+        } else {
+            $query->where('users.status', 'active');
+        }
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -39,7 +46,7 @@ class UserController extends Controller
 
         $barangays = DB::table('barangays')->select('id', 'name')->orderBy('name')->get();
 
-        return view('pages.users.list', compact('users', 'barangays', 'search'));
+        return view('pages.users.list', compact('users', 'barangays', 'search', 'showArchived'));
     }
 
     public function updateUser(Request $request, $id)

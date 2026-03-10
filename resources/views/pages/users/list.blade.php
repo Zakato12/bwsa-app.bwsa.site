@@ -6,7 +6,18 @@
     <div>
         <h1>User List</h1>
 
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            @if(($showArchived ?? false))
+                <a href="{{ route('users.list') }}" class="btn btn-outline-secondary">Show Active Users</a>
+            @else
+                <a href="{{ route('users.list', ['archived' => 1]) }}" class="btn btn-outline-dark">Show Archived Users</a>
+            @endif
+        </div>
+
         <form method="GET" action="{{ route('users.list') }}" class="row g-2 mb-3">
+            @if(($showArchived ?? false))
+                <input type="hidden" name="archived" value="1">
+            @endif
             <div class="col-sm-8 col-md-5">
                 <input type="text" name="q" class="form-control" placeholder="Search users" value="{{ $search ?? '' }}">
             </div>
@@ -14,7 +25,7 @@
                 <button type="submit" class="btn btn-outline-primary">Search</button>
             </div>
             <div class="col-auto">
-                <a href="{{ route('users.list') }}" class="btn btn-outline-secondary">Reset</a>
+                <a href="{{ route('users.list', ($showArchived ?? false) ? ['archived' => 1] : []) }}" class="btn btn-outline-secondary">Reset</a>
             </div>
         </form>
 
