@@ -7,10 +7,6 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1>Audit Logs</h1>
         <div class="d-flex align-items-center gap-2">
-            <form action="{{ route('audit.logs.test') }}" method="POST">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-outline-primary">Create Test Log</button>
-            </form>
             <span class="text-muted">Latest 200 entries</span>
         </div>
     </div>
