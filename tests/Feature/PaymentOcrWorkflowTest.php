@@ -218,6 +218,7 @@ class PaymentOcrWorkflowTest extends TestCase
             'receipt_image_path' => 'receipts/sample.jpg',
             'ocr_text' => 'OCR completed',
             'extracted_amount' => 90.00,
+            'extracted_reference' => 'GCASH-REF-1001',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -235,6 +236,125 @@ class PaymentOcrWorkflowTest extends TestCase
         $this->assertDatabaseHas('payments', [
             'id' => $paymentId,
             'status' => 1,
+        ]);
+    }
+
+    public function test_verify_blocks_duplicate_amount_and_reference(): void
+    {
+        [$treasurerId, $residentUserId] = $this->seedActors(true);
+
+        $originalPaymentId = DB::table('payments')->insertGetId([
+            'user_id' => $residentUserId,
+            'amount' => 150.00,
+            'payment_method' => 2,
+            'status' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('gcash_payments')->insert([
+            'payment_id' => $originalPaymentId,
+            'receipt_image_path' => 'receipts/sample.jpg',
+            'ocr_text' => 'OCR completed',
+            'extracted_amount' => 150.00,
+            'extracted_reference' => 'GCASH-REF-2001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $duplicatePaymentId = DB::table('payments')->insertGetId([
+            'user_id' => $residentUserId,
+            'amount' => 150.00,
+            'payment_method' => 2,
+            'status' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('gcash_payments')->insert([
+            'payment_id' => $duplicatePaymentId,
+            'receipt_image_path' => 'receipts/sample.jpg',
+            'ocr_text' => 'OCR completed',
+            'extracted_amount' => 150.00,
+            'extracted_reference' => 'GCASH-REF-2001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this
+            ->withoutMiddleware([\App\Http\Middleware\CheckInactivity::class])
+            ->withSession([
+                'usr_id' => $treasurerId,
+                'usr_role' => 'treasurer',
+            ])
+            ->post(route('payments.verify', $duplicatePaymentId));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error', 'Duplicate payment detected (same amount and reference). Reject the duplicate submission before verifying.');
+        $this->assertDatabaseHas('payments', [
+            'id' => $duplicatePaymentId,
+            'status' => 1,
+        ]);
+    }
+
+    public function test_verify_allows_duplicate_if_other_is_rejected(): void
+    {
+        [$treasurerId, $residentUserId] = $this->seedActors(true);
+
+        $rejectedPaymentId = DB::table('payments')->insertGetId([
+            'user_id' => $residentUserId,
+            'amount' => 200.00,
+            'payment_method' => 2,
+            'status' => 4,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('gcash_payments')->insert([
+            'payment_id' => $rejectedPaymentId,
+            'receipt_image_path' => 'receipts/sample.jpg',
+            'ocr_text' => 'OCR completed',
+            'extracted_amount' => 200.00,
+            'extracted_reference' => 'GCASH-REF-3001',
+            'rejection_reason' => 'Duplicate submission',
+            'rejected_at' => now(),
+            'rejected_by' => $treasurerId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $paymentId = DB::table('payments')->insertGetId([
+            'user_id' => $residentUserId,
+            'amount' => 200.00,
+            'payment_method' => 2,
+            'status' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('gcash_payments')->insert([
+            'payment_id' => $paymentId,
+            'receipt_image_path' => 'receipts/sample.jpg',
+            'ocr_text' => 'OCR completed',
+            'extracted_amount' => 200.00,
+            'extracted_reference' => 'GCASH-REF-3001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this
+            ->withoutMiddleware([\App\Http\Middleware\CheckInactivity::class])
+            ->withSession([
+                'usr_id' => $treasurerId,
+                'usr_role' => 'treasurer',
+            ])
+            ->post(route('payments.verify', $paymentId));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', 'Payment verified.');
+        $this->assertDatabaseHas('payments', [
+            'id' => $paymentId,
+            'status' => 2,
         ]);
     }
 
