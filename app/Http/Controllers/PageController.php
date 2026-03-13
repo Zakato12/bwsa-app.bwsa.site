@@ -28,6 +28,21 @@ class PageController extends Controller
                     $totalBarangays = DB::table('barangays')->count();
                     $totalPayments = DB::table('payments')->count();
                     $pendingPayments = DB::table('payments')->where('status', 1)->count();
+                    $verifiedPayments = DB::table('payments')->where('status', 2)->count();
+                    $approvedPayments = DB::table('payments')->where('status', 3)->count();
+                    $rejectedPayments = DB::table('payments')->where('status', 4)->count();
+                    $paymentsToday = DB::table('payments')
+                        ->whereDate('created_at', now()->toDateString())
+                        ->count();
+                    $gcashPayments = DB::table('payments')->where('payment_method', 2)->count();
+                    $cashPayments = DB::table('payments')->where('payment_method', 1)->count();
+                    $topBarangays = DB::table('barangays')
+                        ->leftJoin('residents', 'residents.barangay_id', '=', 'barangays.id')
+                        ->select('barangays.name', DB::raw('COUNT(residents.id) as resident_count'))
+                        ->groupBy('barangays.id', 'barangays.name')
+                        ->orderByDesc('resident_count')
+                        ->limit(5)
+                        ->get();
 
                     $recentLogs = [];
                     $logPath = storage_path('logs/audit_ledger.log');
@@ -42,6 +57,13 @@ class PageController extends Controller
                         'totalBarangays',
                         'totalPayments',
                         'pendingPayments',
+                        'verifiedPayments',
+                        'approvedPayments',
+                        'rejectedPayments',
+                        'paymentsToday',
+                        'gcashPayments',
+                        'cashPayments',
+                        'topBarangays',
                         'recentLogs'
                     ));
                 case 'official':
