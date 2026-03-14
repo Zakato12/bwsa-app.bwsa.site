@@ -188,7 +188,57 @@ class PaymentController extends Controller
                     'updated_at' => now(),
                 ]);
 
-                // Recurring auto-generation removed. Advance is recorded on the payment only.
+                if ($isRecurringMonthly) {
+                    for ($i = 1; $i <= $advanceMonths; $i++) {
+                        $advanceDueDate = Carbon::parse($bill->due_date)->addMonthsNoOverflow($i)->toDateString();
+                        $advanceBillName = $this->monthlyBillNameForDate($advanceDueDate);
+
+                        $existingAdvanceBill = DB::table('bills')
+                            ->where('user_id', $userId)
+                            ->where('bill_name', $advanceBillName)
+                            ->whereDate('due_date', $advanceDueDate)
+                            ->exists();
+
+                        if (!$existingAdvanceBill) {
+                            DB::table('bills')->insert([
+                                'user_id' => $userId,
+                                'bill_name' => $advanceBillName,
+                                'amount' => $bill->amount,
+                                'due_date' => $advanceDueDate,
+                                'status' => 'paid',
+                                'paid_at' => now(),
+                                'is_recurring' => 1,
+                                'recurrence_type' => $bill->recurrence_type,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                        }
+                    }
+
+                    $nextDueDate = Carbon::parse($bill->due_date)->addMonthsNoOverflow($advanceMonths + 1)->toDateString();
+                    $nextBillName = $this->monthlyBillNameForDate($nextDueDate);
+                    $existingNextBill = DB::table('bills')
+                        ->where('user_id', $userId)
+                        ->where('bill_name', $nextBillName)
+                        ->whereDate('due_date', $nextDueDate)
+                        ->whereIn('status', ['pending', 'overdue'])
+                        ->exists();
+
+                    if (!$existingNextBill) {
+                        DB::table('bills')->insert([
+                            'user_id' => $userId,
+                            'bill_name' => $nextBillName,
+                            'amount' => $bill->amount,
+                            'due_date' => $nextDueDate,
+                            'status' => 'pending',
+                            'paid_at' => null,
+                            'is_recurring' => 1,
+                            'recurrence_type' => $bill->recurrence_type,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
 
                 return ['state' => 'created', 'payment_id' => $paymentId];
             });
@@ -1068,15 +1118,66 @@ class PaymentController extends Controller
             'updated_at' => now(),
         ]);
 
-        if ($unpaidBill) {
-            DB::table('bills')->where('id', $unpaidBill->id)->update([
-                'status' => 'paid',
-                'paid_at' => now(),
-                'updated_at' => now(),
-            ]);
+            if ($unpaidBill) {
+                DB::table('bills')->where('id', $unpaidBill->id)->update([
+                    'status' => 'paid',
+                    'paid_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-            // Recurring auto-generation removed. Advance is recorded on the payment only.
-        }
+                if ($isRecurringMonthly) {
+                    for ($i = 1; $i <= $advanceMonths; $i++) {
+                        $advanceDueDate = Carbon::parse($unpaidBill->due_date)->addMonthsNoOverflow($i)->toDateString();
+                        $advanceBillName = $this->monthlyBillNameForDate($advanceDueDate);
+
+                        $existingAdvanceBill = DB::table('bills')
+                            ->where('user_id', (int) $request->user_id)
+                            ->where('bill_name', $advanceBillName)
+                            ->whereDate('due_date', $advanceDueDate)
+                            ->exists();
+
+                        if (!$existingAdvanceBill) {
+                            DB::table('bills')->insert([
+                                'user_id' => (int) $request->user_id,
+                                'bill_name' => $advanceBillName,
+                                'amount' => $unpaidBill->amount,
+                                'due_date' => $advanceDueDate,
+                                'status' => 'paid',
+                                'paid_at' => now(),
+                                'is_recurring' => 1,
+                                'recurrence_type' => 'monthly',
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                        }
+                    }
+
+                    $nextDueDate = Carbon::parse($unpaidBill->due_date)->addMonthsNoOverflow($advanceMonths + 1)->toDateString();
+                    $nextBillName = $this->monthlyBillNameForDate($nextDueDate);
+
+                    $existsNext = DB::table('bills')
+                        ->where('user_id', (int) $request->user_id)
+                        ->where('bill_name', $nextBillName)
+                        ->whereDate('due_date', $nextDueDate)
+                        ->whereIn('status', ['pending', 'overdue'])
+                        ->exists();
+
+                    if (!$existsNext) {
+                        DB::table('bills')->insert([
+                            'user_id' => (int) $request->user_id,
+                            'bill_name' => $nextBillName,
+                            'amount' => $unpaidBill->amount,
+                            'due_date' => $nextDueDate,
+                            'status' => 'pending',
+                            'paid_at' => null,
+                            'is_recurring' => 1,
+                            'recurrence_type' => 'monthly',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+            }
 
         Log::info('payments.walkin_created', [
             'actor_id' => session('usr_id'),
